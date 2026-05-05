@@ -1,0 +1,7 @@
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "https://e.linkh5.cn",
+    "ANTHROPIC_API_KEY": "<REPLACE_WITH_YOUR_API_KEY>",
+    "ANTHROPIC_MODEL": "qwen3.6-plus"
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "_comment": "⚠️ 安全：apiKey 为火山引擎密钥，请勿提交真实值到 Git。",
+  "apiKey": "<REPLACE_WITH_YOUR_VOLCES_API_KEY>",
+  "baseUrl": "https://ark.cn-beijing.volces.com/api/coding",
+  "model": "ark-code-latest"
+}

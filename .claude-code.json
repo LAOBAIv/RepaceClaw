@@ -1,0 +1,6 @@
+{
+  "_comment": "⚠️ 安全：apiKey 为敏感信息，请勿提交真实值。使用本地 .claude-code.local.json 覆盖。",
+  "apiKey": "<REPLACE_WITH_YOUR_API_KEY>",
+  "baseUrl": "https://e.linkh5.cn",
+  "model": "claude-opus-4-6"
+}
