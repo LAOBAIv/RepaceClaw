@@ -386,7 +386,7 @@ export const useTaskStore = create<TaskState>()(
       // 旧全局 key `wb-task-store` 导致不同用户看到彼此的项目/任务数据
       name: (() => {
         try {
-          const auth = JSON.parse(localStorage.getItem('wb-auth') || '{}');
+          const auth = JSON.parse(localStorage.getItem('repaceclaw-auth') || '{}');
           const uid = auth?.state?.user?.id;
           return uid ? `wb-task-store-${uid}` : 'wb-task-store';
         } catch {

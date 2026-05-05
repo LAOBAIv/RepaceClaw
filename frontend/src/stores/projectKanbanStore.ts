@@ -264,7 +264,7 @@ export const useProjectKanbanStore = create<ProjectKanbanState>()(
       // 旧全局 key `wb-project-kanban-store` 导致不同用户看到彼此的项目数据
       name: (() => {
         try {
-          const auth = JSON.parse(localStorage.getItem('wb-auth') || '{}');
+          const auth = JSON.parse(localStorage.getItem('repaceclaw-auth') || '{}');
           const uid = auth?.state?.user?.id;
           return uid ? `wb-project-kanban-store-${uid}` : 'wb-project-kanban-store';
         } catch {
