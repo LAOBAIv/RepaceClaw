@@ -3,6 +3,7 @@ import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   Bot, Layers,
   ChevronLeft, ChevronRight, Settings, Network, Sparkles, PlusCircle, Wrench, Puzzle, ShieldCheck, Library, LogOut, MessageCircle,
+  User, Mail, Shield, ChevronDown,
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 
@@ -36,6 +37,148 @@ const CURRENT_PROJECT = {
   name: 'RepaceClaw智能体平台',
   phase: '开发阶段',
 };
+
+/* ─── 顶部用户信息栏 ────────────────────────────────────────── */
+const ROLE_LABEL: Record<string, string> = {
+  super_admin: '超级管理员',
+  admin: '管理员',
+  user: '普通用户',
+};
+
+function UserHeader() {
+  const navigate = useNavigate();
+  const { user, logout } = useAuthStore();
+  const [showMenu, setShowMenu] = useState(false);
+  const menuRef = useState<HTMLDivElement | null>(null)[1];
+
+  if (!user) return null;
+
+  return (
+    <div style={{
+      height: 44, flexShrink: 0,
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '0 20px',
+      background: '#fff',
+      borderBottom: '1px solid #f0f0f0',
+    }}>
+      {/* 左侧：当前页面路径提示 */}
+      <div style={{ fontSize: 12, color: '#9ca3af' }}>
+        {user.username}
+      </div>
+
+      {/* 右侧：用户信息入口 */}
+      <div style={{ position: 'relative' }} ref={(el) => (menuRef as any) = el}>
+        <button
+          onClick={() => setShowMenu(v => !v)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            padding: '4px 12px 4px 4px',
+            borderRadius: 20,
+            border: '1px solid #e5e7eb',
+            background: showMenu ? '#f9fafb' : '#fff',
+            cursor: 'pointer',
+            transition: 'all 0.15s',
+          }}
+        >
+          {/* 头像 */}
+          <div style={{
+            width: 26, height: 26, borderRadius: '50%',
+            background: 'linear-gradient(135deg, #6366f1, #3b82f6)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: '#fff', fontSize: 12, fontWeight: 600,
+          }}>
+            {(user.username || 'U').charAt(0).toUpperCase()}
+          </div>
+          <span style={{ fontSize: 13, color: '#1f2937', fontWeight: 500 }}>{user.username}</span>
+          <ChevronDown size={14} color="#9ca3af" />
+        </button>
+
+        {/* 下拉菜单 */}
+        {showMenu && (
+          <>
+            {/* 点击外部关闭 */}
+            <div
+              style={{ position: 'fixed', inset: 0, zIndex: 999 }}
+              onClick={() => setShowMenu(false)}
+            />
+            <div style={{
+              position: 'absolute', top: '100%', right: 0, marginTop: 8,
+              width: 240,
+              background: '#fff',
+              borderRadius: 12,
+              border: '1px solid #e5e7eb',
+              boxShadow: '0 10px 40px rgba(0,0,0,0.1)',
+              zIndex: 1000,
+              overflow: 'hidden',
+            }}>
+              {/* 用户信息卡片 */}
+              <div style={{ padding: '16px', background: 'linear-gradient(135deg, #f0f0ff, #f0f7ff)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                  <div style={{
+                    width: 36, height: 36, borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #6366f1, #3b82f6)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: '#fff', fontSize: 16, fontWeight: 600,
+                  }}>
+                    {(user.username || 'U').charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 14, color: '#1f2937' }}>{user.username}</div>
+                    <div style={{
+                      fontSize: 11, padding: '1px 6px', borderRadius: 4,
+                      background: user.role === 'super_admin' ? '#fef3c7' : user.role === 'admin' ? '#eff6ff' : '#f3f4f6',
+                      color: user.role === 'super_admin' ? '#d97706' : user.role === 'admin' ? '#2563eb' : '#6b7280',
+                      display: 'inline-block', marginTop: 2,
+                    }}>
+                      {ROLE_LABEL[user.role] || user.role}
+                    </div>
+                  </div>
+                </div>
+                {/* 详细信息 */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#6b7280' }}>
+                    <Mail size={12} />
+                    <span>{user.email || '-'}</span>
+                  </div>
+                  {user.id && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#9ca3af' }}>
+                      <Shield size={11} />
+                      <span style={{ fontFamily: 'monospace' }}>ID: {user.id.slice(0, 8)}...</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 操作菜单 */}
+              <div style={{ padding: '4px 0' }}>
+                <button
+                  onClick={() => {
+                    setShowMenu(false);
+                    if (confirm('确定要退出登录吗？')) {
+                      logout();
+                      navigate('/login');
+                    }
+                  }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    width: '100%', padding: '10px 16px',
+                    background: 'transparent', border: 'none',
+                    color: '#ef4444', fontSize: 13, cursor: 'pointer',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = '#fef2f2'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+                >
+                  <LogOut size={14} />
+                  退出登录
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export function AppShell() {
   const [collapsed, setCollapsed] = useState(false);
@@ -201,36 +344,13 @@ export function AppShell() {
           >
             {collapsed ? <ChevronRight size={16} /> : <><ChevronLeft size={16} /><span>收起</span></>}
           </button>
-
-          {/* 退出登录 */}
-          <button
-            onClick={() => {
-              if (confirm('确定要退出登录吗？')) {
-                useAuthStore.getState().logout();
-                navigate('/login');
-              }
-            }}
-            style={{
-              display: 'flex', alignItems: 'center',
-              gap: collapsed ? 0 : 10,
-              justifyContent: collapsed ? 'center' : 'flex-start',
-              padding: '9px 10px', borderRadius: 8,
-              background: 'transparent', border: 'none',
-              color: '#ef4444', fontSize: 13, cursor: 'pointer',
-              width: '100%',
-              marginTop: 2,
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = '#fef2f2'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
-          >
-            <LogOut size={16} style={{ flexShrink: 0 }} />
-            {!collapsed && '退出登录'}
-          </button>
         </div>
       </aside>
 
       {/* ── Main ── */}
       <main style={{ flex: 1, minWidth: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        {/* ── 顶部用户信息栏 ── */}
+        <UserHeader />
         <Outlet />
       </main>
     </div>
