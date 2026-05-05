@@ -48,7 +48,19 @@ export function AuthPage() {
         });
       }
       login(result.user, result.token);
-      navigate("/", { replace: true });
+      // ⚠️ 清理旧用户的所有 store 缓存，防止跨用户数据串扰
+      // zustand persist 的 name 在模块加载时执行一次，不会随登录动态更新
+      // 必须清理后刷新，让新用户的 key 生效
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.startsWith('wb-') || key.startsWith('repaceclaw-conversations-') || key.startsWith('repaceclaw-'))) {
+          if (key !== 'repaceclaw-auth') keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(k => localStorage.removeItem(k));
+      // 强制刷新页面，store 用新用户的 auth 重新初始化
+      window.location.replace('/workspace');
     } catch (err: any) {
       setError(err.response?.data?.error || "操作失败，请重试");
     } finally {
