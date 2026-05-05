@@ -207,7 +207,16 @@ export const useSessionKanbanStore = create<SessionKanbanState>()(
       },
     }),
     {
-      name: 'wb-session-kanban-store-v4', // v3 → v4：新增 deleted 列
+      // ⚠️ 防跨用户数据串扰：storage key 按用户隔离
+      name: (() => {
+        try {
+          const auth = JSON.parse(sessionStorage.getItem('wb-auth') || '{}');
+          const uid = auth?.state?.user?.id;
+          return uid ? `wb-session-kanban-store-${uid}` : 'wb-session-kanban-store-v4';
+        } catch {
+          return 'wb-session-kanban-store-v4';
+        }
+      })(),
       version: 4,
       storage: createJSONStorage(() => sessionStorage),
       migrate: (persistedState: any, version: number) => {

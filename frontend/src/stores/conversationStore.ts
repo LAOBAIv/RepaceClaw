@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { persist, createJSONStorage } from "zustand/middleware";
 import { Message, Conversation } from "../types";
 import { conversationsApi } from "../api/conversations";
 
@@ -1291,8 +1291,19 @@ export const useConversationStore = create<ConversationStore>()(
   },
   }),
   {
-    name: "repaceclaw-conversations",
+    // ⚠️ 防跨用户数据串扰：localStorage key 按用户隔离
+    // 旧全局 key `repaceclaw-conversations` 导致不同用户看到彼此的会话/Tab/Panel 快照
+    name: (() => {
+      try {
+        const auth = JSON.parse(localStorage.getItem('repaceclaw-auth') || '{}');
+        const uid = auth?.state?.user?.id;
+        return uid ? `repaceclaw-conversations-${uid}` : 'repaceclaw-conversations';
+      } catch {
+        return 'repaceclaw-conversations';
+      }
+    })(),
     version: 4, // 版本升级：持久化 openPanels 快照，刷新后恢复 panel/智能体/历史
+    storage: createJSONStorage(() => localStorage),
     migrate: (persistedState: any, version: number) => {
       // 无条件重置：旧数据格式完全不兼容，避免任何崩溃
       return {

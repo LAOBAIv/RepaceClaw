@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import { projectsApi } from '../api/projects';
 
 /* ─── 业务规则（重要）───────────────────────────────────────────
@@ -260,7 +260,18 @@ export const useProjectKanbanStore = create<ProjectKanbanState>()(
       },
     }),
     {
-      name: 'wb-project-kanban-store',  // localStorage key
+      // ⚠️ 防跨用户数据串扰：localStorage key 按用户隔离
+      // 旧全局 key `wb-project-kanban-store` 导致不同用户看到彼此的项目数据
+      name: (() => {
+        try {
+          const auth = JSON.parse(localStorage.getItem('wb-auth') || '{}');
+          const uid = auth?.state?.user?.id;
+          return uid ? `wb-project-kanban-store-${uid}` : 'wb-project-kanban-store';
+        } catch {
+          return 'wb-project-kanban-store';
+        }
+      })(),
+      storage: createJSONStorage(() => localStorage),
     }
   )
 );

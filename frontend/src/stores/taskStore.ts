@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import { tasksApi } from '../api/tasks';
 
 /* ─── 业务规则（重要）───────────────────────────────────────────
@@ -382,7 +382,18 @@ export const useTaskStore = create<TaskState>()(
       },
     }),
     {
-      name: 'wb-task-store',   // localStorage key
+      // ⚠️ 防跨用户数据串扰：localStorage key 按用户隔离
+      // 旧全局 key `wb-task-store` 导致不同用户看到彼此的项目/任务数据
+      name: (() => {
+        try {
+          const auth = JSON.parse(localStorage.getItem('wb-auth') || '{}');
+          const uid = auth?.state?.user?.id;
+          return uid ? `wb-task-store-${uid}` : 'wb-task-store';
+        } catch {
+          return 'wb-task-store';
+        }
+      })(),
+      storage: createJSONStorage(() => localStorage),
     }
   )
 );
