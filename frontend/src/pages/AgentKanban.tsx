@@ -368,8 +368,8 @@ export function AgentKanban() {
 
         {/* ── Header ── */}
         <div style={{
-          padding: '16px 32px', borderBottom: '1px solid #e5e6eb',
-          background: '#fff', flexShrink: 0,
+          padding: '16px 32px', minHeight: 58, borderBottom: '1px solid #e5e6eb',
+          background: '#fff', flexShrink: 0, boxSizing: 'border-box',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

@@ -9,12 +9,17 @@ import { AgentService } from "../services/AgentService";
 import { ConversationService } from "../services/ConversationService";
 import { ProjectService } from "../services/ProjectService";
 import { UserService } from "../services/UserService";
+import { FileContextService } from "../services/FileContextService";
 import http from "http";
 import https from "https";
 import { v4 as uuidv4 } from "uuid";
 import { REPACECLAW_MESSAGE_CHANNEL, resolveOpenClawGateway } from '../utils/openclawGateway';
 
 const { url: GATEWAY_URL, token: GATEWAY_TOKEN } = resolveOpenClawGateway();
+
+function buildRcOcSessionKey(ocAgentId: string, conversationId: string): string {
+  return `agent:${ocAgentId}:rc:${conversationId}`;
+}
 
 interface WSMessage {
   type: "chat" | "multi_chat" | "ping" | "auth";
@@ -203,6 +208,14 @@ export function setupWebSocket(server: http.Server) {
           systemPrompt += `\n\n本会话标题已从“${previousTitle}”更新为“${effectiveTitle}”，后续请以新标题为准。`;
         }
 
+        // 会话文件上下文：优先按 user_id + conversation_id 注入已上传文件摘要。
+        // 当前先做轻量识别，让智能体明确知道“会话里有哪些文件”；
+        // 后续再把 Excel/CSV 深度解析结果接进来。
+        const fileContext = await FileContextService.buildConversationFileContext(client.userId || '', conv.id);
+        if (fileContext) {
+          systemPrompt += `\n\n${fileContext}`;
+        }
+
         // 获取历史消息
         const historyMessages = ConversationService.getMessages(conv.id);
         const history = historyMessages.map((m) => ({
@@ -211,8 +224,11 @@ export function setupWebSocket(server: http.Server) {
         }));
 
         // 调用 OpenClaw Gateway 生成回复（消息存业务 agentId，路由用 ocAgentId）
-        await callGateway(ws, conversationId, targetAgentId, ocAgentId, systemPrompt, history, content, client.userId);
-         return;
+        logger.info(`[WS] chat conversation=${conv.id} agent=${targetAgentId} ocAgent=${ocAgentId} user=${client.userId?.slice(0, 8) || 'unknown'}`);
+        // 关键修复：这里必须传真实会话主键 conv.id，不能继续传前端原始 conversationId。
+        // 前端允许传 UUID / session_code，前面已经通过 getByIdOrCode() 解析过一次。
+        // 如果这里继续把原始值传进 callGateway，会导致流式回复和 agent 消息可能写到错误会话，表现为“用户发出去了，但智能体不响应/看不到响应”。
+        await callGateway(ws, conv.id, targetAgentId, ocAgentId, systemPrompt, history, content, client.userId);
         return;
       }
 
@@ -296,7 +312,8 @@ export function setupWebSocket(server: http.Server) {
               content: m.content,
             }));
 
-            await callGateway(ws, conversationId, agent.id, ocAgentId, systemPrompt, history, content, client.userId);
+            // 关键修复：多智能体协作场景同样必须使用已解析的真实会话主键 conv.id。
+            await callGateway(ws, conv.id, agent.id, ocAgentId, systemPrompt, history, content, client.userId);
           }
 
           ws.send(JSON.stringify({ type: "workflow_node_done", nodeId: node.id }));
@@ -348,6 +365,9 @@ async function callGateway(
   userContent: string,
   userId?: string
 ): Promise<void> {
+  const ocSessionKey = buildRcOcSessionKey(ocAgentId, conversationId);
+  ConversationService.bindOpenClawSession(conversationId, ocSessionKey, agentId);
+
   if (userId) {
     const quotaResult = AgentService.checkQuota(agentId, userId);
     if (!quotaResult.allowed) {
@@ -373,7 +393,7 @@ async function callGateway(
       { role: "user", content: userContent },
     ];
 
-    logger.info(`[Gateway] Calling model=openclaw/${ocAgentId}, messages=${messages.length}`);
+    logger.info(`[Gateway] Calling model=openclaw/${ocAgentId}, sessionKey=${ocSessionKey}, messages=${messages.length}`);
 
     const url = new URL(`${GATEWAY_URL}/v1/chat/completions`);
     // 流式输出：用户 1~2 秒内看到第一个字，无需等待完整响应
@@ -391,6 +411,10 @@ async function callGateway(
         "Content-Length": Buffer.byteLength(payload),
         "Authorization": `Bearer ${GATEWAY_TOKEN}`,
         "x-openclaw-message-channel": REPACECLAW_MESSAGE_CHANNEL,
+        // 关键修复：Gateway 不能只收到裸 conversationId。
+        // OpenClaw 要靠 agent 形状的 session key 才会把会话落到对应 agent 目录，
+        // 否则即使 model=openclaw/rc-ops-agent，也可能把会话建到 main。
+        "x-openclaw-session-key": ocSessionKey,
       },
     }, (res) => {
       // 流式输出：累积完整内容用于入库

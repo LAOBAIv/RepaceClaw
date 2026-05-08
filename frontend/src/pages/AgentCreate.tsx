@@ -20,7 +20,41 @@ interface BackendSkill {
 }
 
 const STYLE_TAGS  = ['极简简洁', '详细全面', '口语化', '正式专业'];
-const OUTPUT_TAGS = ['纯文本', '代码优先', '预览+完整代码', '结构化JSON'];
+const OUTPUT_TAGS = ['纯文本', 'Markdown', 'Markdown+完整代码', '结构化JSON'];
+
+const AGENT_TYPE_OPTIONS = [
+  { value: 'dev', label: '工程开发类', desc: '对应 rc-dev-agent' },
+  { value: 'data', label: '数据分析类', desc: '对应 rc-data-agent' },
+  { value: 'creative', label: '内容生成类', desc: '对应 rc-creative-agent' },
+  { value: 'pm', label: '项目管理类', desc: '对应 rc-pm-agent' },
+  { value: 'research', label: '知识推理类', desc: '对应 rc-research-agent' },
+  { value: 'ops', label: '平台策略类', desc: '对应 rc-ops-agent' },
+  { value: 'decision', label: '决策支持类', desc: '对应 rc-decision-agent' },
+  { value: 'general', label: '通用助手类', desc: '对应 rc-general-agent' },
+] as const;
+
+function templateCategoryToAgentType(category?: string): (typeof AGENT_TYPE_OPTIONS)[number]['value'] {
+  switch (category) {
+    case 'engineering':
+    case 'integrations':
+    case 'testing':
+      return 'dev';
+    case 'design':
+      return 'creative';
+    case 'project-management':
+    case 'product':
+      return 'pm';
+    case 'academic':
+      return 'research';
+    case 'marketing':
+    case 'paid-media':
+    case 'strategy':
+    case 'sales':
+      return 'ops';
+    default:
+      return 'general';
+  }
+}
 
 /* ─── CODE 渠道 + 模型预设 ────────────────────────────────── */
 interface CodeModel {
@@ -222,7 +256,8 @@ export function AgentCreate() {
   const [skills, setSkills]         = useState<string[]>([]);
   const [description, setDescription] = useState('');
   const [boundary, setBoundary]     = useState('');
-  const [outputFmt, setOutputFmt]   = useState('预览+完整代码');
+  const [outputFmt, setOutputFmt]   = useState('Markdown');
+  const [agentType, setAgentType]   = useState<(typeof AGENT_TYPE_OPTIONS)[number]['value']>('general');
   // Phase 3: 可见性
   const [visibility, setVisibility] = useState<'private' | 'public' | 'template'>('private');
   // Phase 3: Skill 安全管控
@@ -252,7 +287,8 @@ export function AgentCreate() {
       setSkills(agent.expertise ?? []);
       setDescription(agent.description ?? '');
       setBoundary((agent as any).boundary ?? '');
-      setOutputFmt((agent as any).outputFormat ?? '预览+完整代码');
+      setOutputFmt((agent as any).outputFormat ?? 'Markdown');
+      setAgentType(((agent as any).agentType ?? 'general') as (typeof AGENT_TYPE_OPTIONS)[number]['value']);
       setVisibility((agent as any).visibility ?? 'private');
       return;
     }
@@ -264,7 +300,8 @@ export function AgentCreate() {
     setSkills(agent.expertise ?? []);
     setDescription(agent.description ?? '');
     setBoundary((agent as any).boundary ?? '');
-    setOutputFmt((agent as any).outputFormat ?? '预览+完整代码');
+    setOutputFmt((agent as any).outputFormat ?? 'Markdown');
+    setAgentType(((agent as any).agentType ?? 'general') as (typeof AGENT_TYPE_OPTIONS)[number]['value']);
     // Phase 3: 回填可见性和 Skill 配置
     setVisibility((agent as any).visibility ?? 'private');
     const sc = (agent as any).skillsConfig;
@@ -398,10 +435,12 @@ export function AgentCreate() {
       expertise?: string[];
       systemPrompt?: string;
       vibe?: string;
+      category?: string;
     } | null);
     if (!templateData || isEdit) return;
     if (templateData.name) setName(templateData.name);
     if (templateData.description) setDescription(templateData.description);
+    if (templateData.category) setAgentType(templateCategoryToAgentType(templateData.category));
     if (templateData.systemPrompt) {
       setRole(templateData.systemPrompt);
     }
@@ -695,6 +734,8 @@ export function AgentCreate() {
         // 输出格式 & 能力边界
         outputFormat: outputFmt,
         boundary: boundary.trim(),
+        // RC 执行分类：用于映射到 OC 固定执行智能体
+        agentType,
         // 对话记忆轮数
         memoryTurns: Number(memoryTurns) || 0,
         // 温度覆盖（null = 使用模型默认）
@@ -1625,6 +1666,24 @@ export function AgentCreate() {
                           <option key={tag} value={tag}>{tag}</option>
                         ))}
                       </select>
+                    </div>
+                  </div>
+
+                  {/* 执行分类 */}
+                  <div style={fieldStyle}>
+                    <label style={labelStyle}>执行分类</label>
+                    <select
+                      style={{ ...inputStyle, cursor: 'pointer', appearance: 'auto' } as React.CSSProperties}
+                      value={agentType}
+                      onChange={e => setAgentType(e.target.value as (typeof AGENT_TYPE_OPTIONS)[number]['value'])}
+                      onFocus={focusStyle} onBlur={blurStyle}
+                    >
+                      {AGENT_TYPE_OPTIONS.map(option => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                    <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
+                      当前将映射到：{AGENT_TYPE_OPTIONS.find(option => option.value === agentType)?.desc}
                     </div>
                   </div>
 

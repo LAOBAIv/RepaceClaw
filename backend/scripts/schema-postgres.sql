@@ -341,4 +341,105 @@ CREATE TABLE IF NOT EXISTS usage_stats (
 );
 CREATE INDEX IF NOT EXISTS idx_usage_stats_date ON usage_stats(date);
 
+-- ── V1 Organization / Permission Foundation ────────────────────────────────
+-- 与 SQLite (db/client.ts) 保持一致
+
+CREATE TABLE IF NOT EXISTS departments (
+  id              TEXT PRIMARY KEY,
+  department_code TEXT NOT NULL DEFAULT '',
+  name            TEXT NOT NULL,
+  parent_id       TEXT,
+  owner_user_id   TEXT NOT NULL DEFAULT '',
+  description     TEXT NOT NULL DEFAULT '',
+  status          TEXT NOT NULL DEFAULT 'active',
+  created_at      TEXT NOT NULL,
+  updated_at      TEXT NOT NULL,
+  FOREIGN KEY (parent_id) REFERENCES departments(id) ON DELETE SET NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_departments_code ON departments(department_code);
+CREATE INDEX        IF NOT EXISTS idx_departments_parent_id ON departments(parent_id);
+
+CREATE TABLE IF NOT EXISTS roles (
+  id               TEXT PRIMARY KEY,
+  role_code        TEXT NOT NULL DEFAULT '',
+  name             TEXT NOT NULL,
+  scope_type       TEXT NOT NULL DEFAULT 'department',
+  scope_id         TEXT NOT NULL DEFAULT '',
+  description      TEXT NOT NULL DEFAULT '',
+  permissions_json TEXT NOT NULL DEFAULT '{}',
+  status           TEXT NOT NULL DEFAULT 'active',
+  created_at       TEXT NOT NULL,
+  updated_at       TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_roles_code ON roles(role_code);
+CREATE INDEX        IF NOT EXISTS idx_roles_scope ON roles(scope_type, scope_id);
+
+CREATE TABLE IF NOT EXISTS permission_templates (
+  id            TEXT PRIMARY KEY,
+  template_code TEXT NOT NULL DEFAULT '',
+  name          TEXT NOT NULL,
+  description   TEXT NOT NULL DEFAULT '',
+  template_type TEXT NOT NULL DEFAULT 'base',
+  config_json   TEXT NOT NULL DEFAULT '{}',
+  status        TEXT NOT NULL DEFAULT 'active',
+  created_at    TEXT NOT NULL,
+  updated_at    TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_permission_templates_code ON permission_templates(template_code);
+
+CREATE TABLE IF NOT EXISTS user_org_scope (
+  id                     TEXT PRIMARY KEY,
+  user_id                TEXT NOT NULL,
+  department_id          TEXT,
+  role_id                TEXT,
+  permission_template_id TEXT,
+  title                  TEXT NOT NULL DEFAULT '',
+  is_primary             INTEGER NOT NULL DEFAULT 0,
+  status                 TEXT NOT NULL DEFAULT 'active',
+  joined_at              TEXT NOT NULL DEFAULT '',
+  created_at             TEXT NOT NULL,
+  updated_at             TEXT NOT NULL,
+  FOREIGN KEY (user_id)                REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (department_id)          REFERENCES departments(id) ON DELETE SET NULL,
+  FOREIGN KEY (role_id)                REFERENCES roles(id) ON DELETE SET NULL,
+  FOREIGN KEY (permission_template_id) REFERENCES permission_templates(id) ON DELETE SET NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_user_org_scope_unique ON user_org_scope(user_id, department_id, role_id);
+CREATE INDEX        IF NOT EXISTS idx_user_org_scope_user ON user_org_scope(user_id);
+CREATE INDEX        IF NOT EXISTS idx_user_org_scope_department ON user_org_scope(department_id);
+CREATE INDEX        IF NOT EXISTS idx_user_org_scope_role ON user_org_scope(role_id);
+
+CREATE TABLE IF NOT EXISTS user_proxy_grants (
+  id         TEXT PRIMARY KEY,
+  user_id    TEXT NOT NULL,
+  agent_id   TEXT NOT NULL,
+  grant_type TEXT NOT NULL DEFAULT 'use',
+  scope_type TEXT NOT NULL DEFAULT 'direct',
+  scope_id   TEXT NOT NULL DEFAULT '',
+  created_by TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (user_id)  REFERENCES users(id)  ON DELETE CASCADE,
+  FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_user_proxy_grants_unique ON user_proxy_grants(user_id, agent_id, grant_type, scope_type, scope_id);
+CREATE INDEX        IF NOT EXISTS idx_user_proxy_grants_user ON user_proxy_grants(user_id);
+CREATE INDEX        IF NOT EXISTS idx_user_proxy_grants_agent ON user_proxy_grants(agent_id);
+
+CREATE TABLE IF NOT EXISTS user_data_grants (
+  id            TEXT PRIMARY KEY,
+  user_id       TEXT NOT NULL,
+  resource_type TEXT NOT NULL,
+  resource_id   TEXT NOT NULL DEFAULT '',
+  grant_type    TEXT NOT NULL DEFAULT 'read',
+  scope_type    TEXT NOT NULL DEFAULT 'direct',
+  scope_id      TEXT NOT NULL DEFAULT '',
+  created_by    TEXT NOT NULL DEFAULT '',
+  created_at    TEXT NOT NULL,
+  updated_at    TEXT NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_user_data_grants_unique ON user_data_grants(user_id, resource_type, resource_id, grant_type, scope_type, scope_id);
+CREATE INDEX        IF NOT EXISTS idx_user_data_grants_user ON user_data_grants(user_id);
+
 COMMIT;

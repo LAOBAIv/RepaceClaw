@@ -18,6 +18,7 @@ import searchRoutes from './search';
 import exportImportRoutes from './exportImport';
 import skillRoutes from './skills';
 import pluginRoutes from './plugins';
+import fileRoutes from './files';
 import doubaoRoutes from './doubao';
 import openaiCompatRoutes from './openaiCompat';
 import modelProviderRoutes from './modelProviders';
@@ -30,6 +31,7 @@ import auditLogRoutes from './auditLogs';
 import systemStatsRoutes from './systemStats';
 import sessionTabsRoutes from './sessionTabs';
 import sessionsRoutes from './sessions';
+import wechatClawBotRoutes from './wechatClawBot';
 
 // 路由配置项
 interface RouteConfig {
@@ -52,6 +54,7 @@ const apiRoutes: RouteConfig[] = [
   { path: '/import', router: exportImportRoutes },
   { path: '/skills', router: skillRoutes },
   { path: '/plugins', router: pluginRoutes },
+  { path: '/files', router: fileRoutes },
   { path: '/doubao', router: doubaoRoutes },
   { path: '/model-providers', router: modelProviderRoutes },
   { path: '/models', router: modelRoutes },
@@ -63,6 +66,7 @@ const apiRoutes: RouteConfig[] = [
   { path: '/system/stats', router: systemStatsRoutes, prefix: '/api' },
   { path: '/session-tabs', router: sessionTabsRoutes, prefix: '/api' },
   { path: '/sessions', router: sessionsRoutes, prefix: '/api' },
+{ path: '/wechat-clawbot', router: wechatClawBotRoutes },
 ];
 
 // 外部兼容路由列表（不使用 /api 前缀）

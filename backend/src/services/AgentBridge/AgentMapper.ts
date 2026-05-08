@@ -1,23 +1,26 @@
 /**
  * AgentMapper — RepaceClaw agent ↔ OpenClaw agentId 双向映射
  *
- * 策略：按业务类型（agent_type）映射到对应的 OpenClaw agent
- * 
- * 类型映射表：
- *   dev      → rc-dev-agent        开发/工程
- *   data     → rc-data-agent       数据分析
- *   creative → rc-creative-agent   内容/创作
- *   pm       → rc-pm-agent         产品/管理
- *   research → rc-research-agent   AI/研究
- *   ops      → rc-ops-agent        运营
- *   decision → rc-decision-agent   决策
- *   general  → rc-general-agent    通用/助手
- * 
+ * 策略：按业务类型（agent_type）映射到对应的 OpenClaw agent。
+ *
+ * 2026-05-05 之后的标准口径：
+ *   dev      → rc-dev-agent        工程开发类
+ *   data     → rc-data-agent       数据分析类
+ *   creative → rc-creative-agent   内容生成类
+ *   pm       → rc-pm-agent         项目管理类
+ *   research → rc-research-agent   知识推理类
+ *   ops      → rc-ops-agent        平台策略类
+ *   decision → rc-decision-agent   决策支持类
+ *   general  → rc-general-agent    通用助手类
+ *
  * 平台助手（repaceclaw-platform-assistant）独立存在，不走此映射。
  */
 
 /**
  * 业务类型 → OpenClaw agentId 映射表
+ *
+ * 注意：这里的 key 仍沿用历史技术字段值（dev/data/creative/pm/research/ops/decision/general），
+ * 但业务含义已经统一收敛为：工程开发 / 数据分析 / 内容生成 / 项目管理 / 知识推理 / 平台策略 / 决策支持 / 通用助手。
  */
 const AGENT_TYPE_MAP: Record<string, string> = {
   dev: 'rc-dev-agent',
@@ -32,13 +35,15 @@ const AGENT_TYPE_MAP: Record<string, string> = {
 
 /**
  * 默认类型（未指定 agent_type 时使用）
+ *
+ * 历史遗留或无法判定归属的 RC 智能体，默认进入通用助手类。
  */
 const DEFAULT_AGENT_TYPE = 'general';
 
 /**
  * 将 RepaceClaw 业务智能体映射到 OpenClaw agentId
- * 
- * @param agentType 业务类型（dev/data/creative/pm/research/ops/decision/general）
+ *
+ * @param agentType 技术字段值（dev/data/creative/pm/research/ops/decision/general）
  * @returns OpenClaw agentId
  */
 export function toOpenClawAgentId(agentType?: string): string {

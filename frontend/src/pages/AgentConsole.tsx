@@ -278,9 +278,15 @@ export function AgentConsole() {
   const location = useLocation();
   const { agents, fetchAgents } = useAgentStore();
   const { fetchProjects, createProject, projects: backendProjects } = useProjectStore();
-  const { addProject, updateProject } = useProjectKanbanStore();
-  const { updateTask, addTask } = useTaskStore();
-  useEffect(() => { fetchAgents(); fetchProjects(); }, [fetchAgents, fetchProjects]);
+  const { addProject, updateProject, restoreFromPersist: restoreProjectKanban } = useProjectKanbanStore();
+  const { updateTask, addTask, restoreFromPersist: restoreTasks } = useTaskStore();
+  useEffect(() => {
+    fetchAgents();
+    fetchProjects();
+    // Day 2: 任务/项目看板恢复链路补全（此前从未调用，刷新后看板数据丢失）
+    restoreTasks().catch(() => {});
+    restoreProjectKanban().catch(() => {});
+  }, [fetchAgents, fetchProjects, restoreTasks, restoreProjectKanban]);
   const agentList = agents.length > 0 ? agents : DEFAULT_AGENTS;
 
   /* 从看板「编辑」跳转时带入的预填数据 */

@@ -3,9 +3,17 @@ import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   Bot, Layers,
   ChevronLeft, ChevronRight, Settings, Network, Sparkles, PlusCircle, Wrench, Puzzle, ShieldCheck, Library, LogOut, MessageCircle,
-  User, Mail, Shield, ChevronDown,
+  User, Mail, Shield, ChevronDown, Copy, Check,
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
+import { getOrCreateTabId, clearAllSessionData, clearAllRcStorage } from '../../lib/storageScope';
+// Plan C: 接入点 1 — sync 模块生命周期管理
+import { getBroadcastSync, destroyBroadcastSync, getWsSync, destroyWsSync, syncEventBus } from '../../lib/sync';
+import { getWsInstance } from '../../stores/conversationStore';
+import { useSessionKanbanStore } from '../../stores/sessionKanbanStore';
+import { useTaskStore } from '../../stores/taskStore';
+import { useProjectKanbanStore } from '../../stores/projectKanbanStore';
+import { useConversationStore } from '../../stores/conversationStore';
 
 /* ─── 页面标题映射 ─────────────────────────────────────────── */
 const PAGE_TITLE_MAP: Record<string, string> = {
@@ -49,30 +57,41 @@ function UserHeader() {
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
   const [showMenu, setShowMenu] = useState(false);
-  const menuRef = useState<HTMLDivElement | null>(null)[1];
+  const [tabId, setTabId] = useState<string>('');
+  const [copied, setCopied] = useState(false);
+
+  // 初始化 tabId
+  useEffect(() => {
+    setTabId(getOrCreateTabId());
+  }, []);
+
+  // 复制 tabId 到剪贴板
+  const handleCopyTabId = () => {
+    navigator.clipboard.writeText(tabId);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
 
   if (!user) return null;
 
   return (
     <div style={{
-      height: 44, flexShrink: 0,
+      minHeight: 46, flexShrink: 0,
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      padding: '0 20px',
-      background: '#fff',
-      borderBottom: '1px solid #f0f0f0',
+      padding: '0 16px',
+      background: 'transparent',
+      borderBottom: 'none',
     }}>
-      {/* 左侧：当前页面路径提示 */}
-      <div style={{ fontSize: 12, color: '#9ca3af' }}>
-        {user.username}
-      </div>
+      {/* 左侧留空：不再显示用户名，避免顶栏出现多余身份文案 */}
+      <div />
 
       {/* 右侧：用户信息入口 */}
-      <div style={{ position: 'relative' }} ref={(el) => (menuRef as any) = el}>
+      <div style={{ position: 'relative' }}>
         <button
           onClick={() => setShowMenu(v => !v)}
           style={{
             display: 'flex', alignItems: 'center', gap: 8,
-            padding: '4px 12px 4px 4px',
+            padding: '3px 10px 3px 3px',
             borderRadius: 20,
             border: '1px solid #e5e7eb',
             background: showMenu ? '#f9fafb' : '#fff',
@@ -80,16 +99,15 @@ function UserHeader() {
             transition: 'all 0.15s',
           }}
         >
-          {/* 头像 */}
           <div style={{
-            width: 26, height: 26, borderRadius: '50%',
+            width: 24, height: 24, borderRadius: '50%',
             background: 'linear-gradient(135deg, #6366f1, #3b82f6)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             color: '#fff', fontSize: 12, fontWeight: 600,
           }}>
             {(user.username || 'U').charAt(0).toUpperCase()}
           </div>
-          <span style={{ fontSize: 13, color: '#1f2937', fontWeight: 500 }}>{user.username}</span>
+          {/* 顶栏只保留头像入口，不再显示用户名，减少横向占用和视觉干扰 */}
           <ChevronDown size={14} color="#9ca3af" />
         </button>
 
@@ -111,42 +129,84 @@ function UserHeader() {
               zIndex: 1000,
               overflow: 'hidden',
             }}>
-              {/* 用户信息卡片 */}
-              <div style={{ padding: '16px', background: 'linear-gradient(135deg, #f0f0ff, #f0f7ff)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+              {/* 用户信息卡片：顶部结构与 Logo 区完全同模板 */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                padding: '16px 14px',
+                justifyContent: 'flex-start',
+                flexShrink: 0,
+                background: 'transparent',
+              }}>
+                <div style={{ minWidth: 0, flex: 1 }}>
                   <div style={{
-                    width: 36, height: 36, borderRadius: '50%',
+                    fontWeight: 700,
+                    fontSize: 13,
+                    color: 'var(--text-primary)',
+                    lineHeight: 1.25,
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  }}>
+                    {user.username}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                    {ROLE_LABEL[user.role] || user.role}
+                  </div>
+                </div>
+              </div>
+
+              {/* 详细信息 */}
+              <div style={{
+                padding: '10px 14px 8px',
+                background: 'transparent',
+                borderTop: '1px solid rgba(148, 163, 184, 0.12)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 8,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{
+                    width: 32, height: 32, borderRadius: '50%',
                     background: 'linear-gradient(135deg, #6366f1, #3b82f6)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: '#fff', fontSize: 16, fontWeight: 600,
+                    color: '#fff', fontSize: 14, fontWeight: 600,
+                    flexShrink: 0,
                   }}>
                     {(user.username || 'U').charAt(0).toUpperCase()}
                   </div>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: 14, color: '#1f2937' }}>{user.username}</div>
-                    <div style={{
-                      fontSize: 11, padding: '1px 6px', borderRadius: 4,
-                      background: user.role === 'super_admin' ? '#fef3c7' : user.role === 'admin' ? '#eff6ff' : '#f3f4f6',
-                      color: user.role === 'super_admin' ? '#d97706' : user.role === 'admin' ? '#2563eb' : '#6b7280',
-                      display: 'inline-block', marginTop: 2,
-                    }}>
-                      {ROLE_LABEL[user.role] || user.role}
-                    </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#6b7280', minWidth: 0 }}>
+                    <Mail size={12} style={{ flexShrink: 0 }} />
+                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user.email || '-'}</span>
                   </div>
                 </div>
-                {/* 详细信息 */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#6b7280' }}>
-                    <Mail size={12} />
-                    <span>{user.email || '-'}</span>
+                {user.id && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#9ca3af' }}>
+                    <Shield size={11} style={{ flexShrink: 0 }} />
+                    <span style={{ fontFamily: 'monospace' }}>ID: {user.id.slice(0, 8)}...</span>
                   </div>
-                  {user.id && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#9ca3af' }}>
-                      <Shield size={11} />
-                      <span style={{ fontFamily: 'monospace' }}>ID: {user.id.slice(0, 8)}...</span>
-                    </div>
-                  )}
-                </div>
+                )}
+                {/* Plan C: Tab ID 显示 */}
+                {tabId && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#9ca3af' }}>
+                    <span style={{ fontFamily: 'monospace' }}>Tab: {tabId.slice(0, 12)}...</span>
+                    <button
+                      onClick={handleCopyTabId}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: 2,
+                        display: 'flex',
+                        alignItems: 'center',
+                      }}
+                      title="复制 Tab ID"
+                    >
+                      {copied ? <Check size={10} color="#10b981" /> : <Copy size={10} color="#9ca3af" />}
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* 操作菜单 */}
@@ -155,6 +215,9 @@ function UserHeader() {
                   onClick={() => {
                     setShowMenu(false);
                     if (confirm('确定要退出登录吗？')) {
+                      // Plan C: 清理 sessionStorage（包括 auth / tabId）和 rc: 业务缓存
+                      clearAllRcStorage();
+                      clearAllSessionData();
                       logout();
                       navigate('/login');
                     }
@@ -184,8 +247,75 @@ export function AppShell() {
   const [collapsed, setCollapsed] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const user = useAuthStore((s) => s.user);
+  const { user, isAuthenticated } = useAuthStore();
   const isAdmin = user?.role === 'super_admin' || user?.role === 'admin';
+
+  /* ─── Plan C 接入点 1：sync 生命周期管理 ──────────────────── */
+  // 登录成功后初始化 BroadcastChannel + WebSocket 同步
+  // 退出登录时销毁所有 sync 资源
+  useEffect(() => {
+    if (!isAuthenticated || !user?.id) {
+      // 未登录：清理残留 sync 实例
+      destroyBroadcastSync();
+      destroyWsSync();
+      return;
+    }
+
+    // 1. 初始化 BroadcastChannel 同步（同浏览器多 Tab）
+    getBroadcastSync(user.id);
+
+    // 2. 初始化 WebSocket 同步（跨浏览器/跨设备）
+    //    复用 conversationStore 的 WS 连接
+    getWsSync(() => getWsInstance(), user.id);
+
+    console.log(`[AppShell] Sync initialized for userId: ${user.id.slice(0, 8)}, tabId: ${getOrCreateTabId()}`);
+
+    // 3. 注册同步事件订阅（收到其他 Tab 的事件后刷新本地数据）
+    const unsubscribes: (() => void)[] = [];
+
+    // 会话打开/关闭：刷新 session list 看板
+    const refreshKanban = () => useSessionKanbanStore.getState().restoreFromPersist();
+    unsubscribes.push(syncEventBus.on('session.opened', refreshKanban));
+    unsubscribes.push(syncEventBus.on('session.closed', refreshKanban));
+
+    // 会话重命名：更新本地 Tab 标题
+    // 关键修复:此前直接调用 renameTab(conversationId, newTitle) 有两个问题:
+    //   1) renameTab 参数是 tabId 不是 conversationId,导致 tab 找不到、静默失败
+    //   2) renameTab 内部会再次 broadcast sync 事件,可能造成多 Tab 间循环广播
+    //   修复方式:从事件载荷中取 tabId,直接更新 store 状态,不调 renameTab
+    unsubscribes.push(syncEventBus.on('session.renamed', (event) => {
+      const { tabId, newTitle } = event.payload as { tabId: string; newTitle: string };
+      if (tabId && newTitle) {
+        const store = useConversationStore.getState();
+        const tab = store.sessionTabs.find(t => t.id === tabId);
+        if (tab) {
+          useConversationStore.setState({
+            sessionTabs: store.sessionTabs.map(t =>
+              t.id === tabId ? { ...t, title: newTitle, previousTitle: t.title !== newTitle ? t.title : t.previousTitle } : t
+            ),
+          });
+        }
+      }
+    }));
+
+    // 任务更新：刷新 task store
+    unsubscribes.push(syncEventBus.on('task.updated', () => {
+      useTaskStore.getState().restoreFromPersist();
+    }));
+
+    // 项目更新：刷新 project kanban store
+    unsubscribes.push(syncEventBus.on('project.updated', () => {
+      useProjectKanbanStore.getState().restoreFromPersist();
+    }));
+
+    // 清理函数：组件卸载或用户退出时销毁
+    return () => {
+      unsubscribes.forEach((unsub) => unsub());
+      destroyBroadcastSync();
+      destroyWsSync();
+      syncEventBus.destroy();
+    };
+  }, [isAuthenticated, user?.id]);
 
   /* ─── 动态设置页面标题 ─────────────────────────────────────── */
   useEffect(() => {
@@ -217,22 +347,24 @@ export function AppShell() {
         <div
           onClick={() => navigate('/')}
           style={{
-            display: 'flex', alignItems: 'center', gap: 10,
-            padding: collapsed ? '20px 0' : '16px 14px',
+            minHeight: 46,
+            display: 'flex', alignItems: 'center', gap: 8,
+            padding: collapsed ? '0' : '0 12px',
             justifyContent: collapsed ? 'center' : 'flex-start',
             cursor: 'pointer', flexShrink: 0,
+            boxSizing: 'border-box',
           }}
         >
           {/* 项目名 + 阶段 */}
           {!collapsed && (
             <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{
-                fontWeight: 700, fontSize: 13, color: 'var(--text-primary)',
-                lineHeight: 1.25, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                fontWeight: 700, fontSize: 12.5, color: 'var(--text-primary)',
+                lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
               }}>
                 {CURRENT_PROJECT.name}
               </div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 0, lineHeight: 1.05 }}>
                 {CURRENT_PROJECT.phase}
               </div>
             </div>
@@ -351,7 +483,14 @@ export function AppShell() {
       <main style={{ flex: 1, minWidth: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         {/* ── 顶部用户信息栏 ── */}
         <UserHeader />
-        <Outlet />
+        {/*
+          关键布局修复：内容页不能自己再按 100vh 计算，否则会把顶部用户栏也算进去，
+          首次进入时容易出现底部输入框被顶出页面的问题。
+          这里统一给 Outlet 一个可收缩的内容容器，页面内部只需要吃满剩余高度即可。
+        */}
+        <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <Outlet />
+        </div>
       </main>
     </div>
   );

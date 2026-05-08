@@ -2,6 +2,8 @@ import { Router, Request, Response } from "express";
 import { z } from "zod";
 import { authenticate, requireRole } from "../middleware/auth";
 import { OrganizationService } from "../services/OrganizationService";
+import { PermissionService } from "../services/PermissionService";
+import { UserService } from "../services/UserService";
 
 const router = Router();
 const adminOnly = [authenticate, requireRole(["super_admin", "admin"])];
@@ -97,6 +99,42 @@ router.put("/users/:id/department", ...adminOnly, (req: Request, res: Response) 
   } catch (err: any) {
     res.status(400).json({ error: err.message || "组织分配失败" });
   }
+});
+
+router.get("/users/:id/permissions", ...adminOnly, (req: Request, res: Response) => {
+  try {
+    const data = PermissionService.getUserPermissionSummary(req.params.id);
+    if (!data) return res.status(404).json({ error: "用户不存在" });
+    res.json({ data });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || "获取权限摘要失败" });
+  }
+});
+
+router.put("/users/:id", ...adminOnly, (req: Request, res: Response) => {
+  const UserUpdateSchema = z.object({
+    role: z.enum(["super_admin", "admin", "user"]).optional(),
+    status: z.enum(["active", "disabled"]).optional(),
+    avatar: z.string().optional(),
+  });
+
+  const parsed = UserUpdateSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.flatten() });
+  }
+
+  try {
+    const data = UserService.updateUser(req.params.id, parsed.data);
+    if (!data) return res.status(404).json({ error: "用户不存在" });
+    res.json({ data });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || "更新用户失败" });
+  }
+});
+
+router.delete("/users/:id", ...adminOnly, (req: Request, res: Response) => {
+  // TODO: 实现删除用户功能（需要处理关联数据）
+  res.status(501).json({ error: "删除用户功能暂未实现" });
 });
 
 export default router;

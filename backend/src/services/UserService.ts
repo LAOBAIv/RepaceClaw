@@ -35,7 +35,11 @@ export interface RegisterInput {
 }
 
 export interface LoginInput {
-  email: string;
+  /**
+   * 兼容登录标识：优先支持邮箱，同时兼容历史老账号用用户名登录。
+   * 前端即使仍沿用 email 字段传值，这里也按“账号标识”处理。
+   */
+  identifier: string;
   password: string;
 }
 
@@ -108,13 +112,17 @@ export class UserService {
   static async login(input: LoginInput): Promise<AuthResult> {
     const db = getDb();
     const now = new Date().toISOString();
+    const identifier = input.identifier.trim();
 
     const res = db.exec(
-      "SELECT id, user_code, username, email, password_hash, role, status, avatar, last_login_at, created_at, updated_at FROM users WHERE email=?",
-      [input.email]
+      `SELECT id, user_code, username, email, password_hash, role, status, avatar, last_login_at, created_at, updated_at
+       FROM users
+       WHERE lower(email)=lower(?) OR username=?
+       LIMIT 1`,
+      [identifier, identifier]
     );
     if (!res.length || !res[0].values.length) {
-      throw new Error("邮箱或密码错误");
+      throw new Error("账号或密码错误");
     }
 
     const row = res[0].values[0];
@@ -127,7 +135,7 @@ export class UserService {
 
     const valid = await bcrypt.compare(input.password, passwordHash);
     if (!valid) {
-      throw new Error("邮箱或密码错误");
+      throw new Error("账号或密码错误");
     }
 
     // 更新最后登录时间
@@ -174,6 +182,31 @@ export class UserService {
     );
     if (!res.length || !res[0].values.length) return null;
     return rowToUser(res[0].values[0]);
+  }
+
+  // 当前用户更新自己的资料
+  static updateProfile(id: string, data: { username?: string; avatar?: string }): User | null {
+    const db = getDb();
+    const now = new Date().toISOString();
+    const current = UserService.getUserById(id);
+    if (!current) return null;
+
+    if (data.username !== undefined) {
+      const username = data.username.trim();
+      if (!username) throw new Error("用户名不能为空");
+      const existUsername = db.exec("SELECT id FROM users WHERE username=? AND id<>?", [username, id]);
+      if (existUsername.length && existUsername[0].values.length) {
+        throw new Error("该用户名已被使用");
+      }
+      db.run("UPDATE users SET username=?, updated_at=? WHERE id=?", [username, now, id]);
+    }
+
+    if (data.avatar !== undefined) {
+      db.run("UPDATE users SET avatar=?, updated_at=? WHERE id=?", [data.avatar.trim(), now, id]);
+    }
+
+    saveDb();
+    return UserService.getUserById(id);
   }
 
   // 更新用户角色/状态（管理员用）

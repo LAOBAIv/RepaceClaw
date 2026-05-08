@@ -56,6 +56,8 @@ const AgentSchema = z.object({
   memoryTurns: z.number().min(0).default(0),
   // 简单温度快捷覆盖
   temperatureOverride: z.number().min(0).max(2).nullable().default(null),
+  // RC -> OC 执行分类
+  agentType: z.enum(['dev', 'data', 'creative', 'pm', 'research', 'ops', 'decision', 'general']).default('general'),
   // Phase 3: 可见性 / Skill 管控 / 配额
   visibility: z.enum(['private', 'public', 'template']).default('private'),
   skillsConfig: z.record(z.string(), z.boolean()).optional(),

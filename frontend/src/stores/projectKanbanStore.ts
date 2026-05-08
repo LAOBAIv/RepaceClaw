@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
 import { projectsApi } from '../api/projects';
 
 /* ─── 业务规则（重要）───────────────────────────────────────────
@@ -164,7 +163,6 @@ interface ProjectKanbanState {
 
 /* ─── Store 实现 ─────────────────────────────────────────────── */
 export const useProjectKanbanStore = create<ProjectKanbanState>()(
-  persist(
     (set) => ({
       projects: EMPTY_PROJECTS,
 
@@ -207,6 +205,11 @@ export const useProjectKanbanStore = create<ProjectKanbanState>()(
         set(state => ({
           projects: { ...state.projects, [col]: [{ ...project, agents: safeAgents }, ...state.projects[col]] },
         }));
+        // 方案 C: 广播项目变更事件
+        import("../lib/sync").then(({ getBroadcastSync }) => {
+          const bc = getBroadcastSync();
+          if (bc) bc.send('project.updated', { projectId: project.id, action: 'add' });
+        }).catch(() => {});
       },
 
       moveProject: (projectId, fromCol, toCol) => {
@@ -221,6 +224,11 @@ export const useProjectKanbanStore = create<ProjectKanbanState>()(
             },
           };
         });
+        // 方案 C: 广播项目变更事件
+        import("../lib/sync").then(({ getBroadcastSync }) => {
+          const bc = getBroadcastSync();
+          if (bc) bc.send('project.updated', { projectId, action: 'move' });
+        }).catch(() => {});
       },
 
       updateProject: (projectId, patch) => {
@@ -237,6 +245,11 @@ export const useProjectKanbanStore = create<ProjectKanbanState>()(
           }
           return { projects: newProjects };
         });
+        // 方案 C: 广播项目变更事件
+        import("../lib/sync").then(({ getBroadcastSync }) => {
+          const bc = getBroadcastSync();
+          if (bc) bc.send('project.updated', { projectId, action: 'update', patch });
+        }).catch(() => {});
       },
 
       removeProject: async (projectId) => {
@@ -257,21 +270,11 @@ export const useProjectKanbanStore = create<ProjectKanbanState>()(
           }
           return { projects: newProjects };
         });
+        // 方案 C: 广播项目变更事件
+        import("../lib/sync").then(({ getBroadcastSync }) => {
+          const bc = getBroadcastSync();
+          if (bc) bc.send('project.updated', { projectId, action: 'remove' });
+        }).catch(() => {});
       },
     }),
-    {
-      // ⚠️ 防跨用户数据串扰：localStorage key 按用户隔离
-      // 旧全局 key `wb-project-kanban-store` 导致不同用户看到彼此的项目数据
-      name: (() => {
-        try {
-          const auth = JSON.parse(localStorage.getItem('repaceclaw-auth') || '{}');
-          const uid = auth?.state?.user?.id;
-          return uid ? `wb-project-kanban-store-${uid}` : 'wb-project-kanban-store';
-        } catch {
-          return 'wb-project-kanban-store';
-        }
-      })(),
-      storage: createJSONStorage(() => localStorage),
-    }
-  )
 );

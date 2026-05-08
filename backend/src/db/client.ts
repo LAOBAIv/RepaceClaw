@@ -120,6 +120,8 @@ function createTables(db: any) {
   try { db.run("ALTER TABLE agents ADD COLUMN quota_config TEXT NOT NULL DEFAULT '{}'"); } catch {}
   // Route C Phase 1: Agent 桥接层 — OpenClaw agentId 映射
   try { db.run("ALTER TABLE agents ADD COLUMN openclaw_agent_id TEXT"); } catch {}
+  // RC 分类 -> OC 执行桶。历史库若缺失此列，会导致 /api/agents/routing-overview 与编辑更新链直接报错。
+  try { db.run("ALTER TABLE agents ADD COLUMN agent_type TEXT NOT NULL DEFAULT 'general'"); } catch {}
 
   // Route C Phase 1: Agent 注册日志表
 
@@ -228,6 +230,28 @@ function createTables(db: any) {
     )
   `);
 
+  // 文件资产表：按 user_id 做强隔离，承载上传文档元数据；原始文件落盘到 uploads/user_id/... 目录。
+  db.run(`
+    CREATE TABLE IF NOT EXISTS file_assets (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      project_id TEXT NOT NULL DEFAULT '',
+      conversation_id TEXT NOT NULL DEFAULT '',
+      original_name TEXT NOT NULL,
+      stored_name TEXT NOT NULL,
+      mime_type TEXT NOT NULL DEFAULT '',
+      extension TEXT NOT NULL DEFAULT '',
+      size_bytes INTEGER NOT NULL DEFAULT 0,
+      storage_path TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'uploaded',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `);
+  try { db.run("CREATE INDEX IF NOT EXISTS idx_file_assets_user_created ON file_assets(user_id, created_at)"); } catch {}
+  try { db.run("CREATE INDEX IF NOT EXISTS idx_file_assets_project ON file_assets(project_id)"); } catch {}
+  try { db.run("CREATE INDEX IF NOT EXISTS idx_file_assets_conversation ON file_assets(conversation_id)"); } catch {}
+
   db.run(`
     CREATE TABLE IF NOT EXISTS conversations (
       id TEXT PRIMARY KEY,
@@ -245,7 +269,12 @@ function createTables(db: any) {
   // Migrate: add task_id and created_by columns (idempotent)
   try { db.run("ALTER TABLE conversations ADD COLUMN task_id TEXT UNIQUE"); } catch {}
   try { db.run("ALTER TABLE conversations ADD COLUMN created_by TEXT"); } catch {}
-  try { db.run("ALTER TABLE conversations ADD COLUMN current_agent_id TEXT NOT DEFAULT ''"); } catch {}
+  // 兼容旧服务层：当前仍有创建/更新逻辑会写 conversations.agent_id / agent_ids 快照列。
+  // 历史某些库是先建了精简版 conversations 表，再逐步演进；如果这里只补 current_agent_id 而没补旧快照列，
+  // 会在创建平台助手等新会话时直接报 “table conversations has no column named agent_id / agent_ids”，表现为前端发送按钮可点、但会话永远发不出去。
+  try { db.run("ALTER TABLE conversations ADD COLUMN agent_id TEXT NOT NULL DEFAULT ''"); } catch {}
+  try { db.run("ALTER TABLE conversations ADD COLUMN agent_ids TEXT NOT NULL DEFAULT '[]'"); } catch {}
+  try { db.run("ALTER TABLE conversations ADD COLUMN current_agent_id TEXT NOT NULL DEFAULT ''"); } catch {}
   // Dual-code Phase 1: session_code / current_agent_code 作为业务会话编码与业务当前智能体编码
   try { db.run("ALTER TABLE conversations ADD COLUMN session_code TEXT NOT NULL DEFAULT ''"); } catch {}
   try { db.run("ALTER TABLE conversations ADD COLUMN current_agent_code TEXT NOT NULL DEFAULT ''"); } catch {}
@@ -260,6 +289,10 @@ function createTables(db: any) {
   try { db.run("ALTER TABLE conversations ADD COLUMN memory_policy TEXT NOT NULL DEFAULT 'private'"); } catch {}
   try { db.run("ALTER TABLE conversations ADD COLUMN summary TEXT NOT NULL DEFAULT ''"); } catch {}
   try { db.run("ALTER TABLE conversations ADD COLUMN last_message_at TEXT NOT NULL DEFAULT ''"); } catch {}
+  // RC -> OC 会话绑定真相源。历史部分库缺这列，会导致 bindOpenClawSession() 在用户消息入库后直接抛错，
+  // 表现为“自己的消息能看到，但智能体永远没回复”。
+  try { db.run("ALTER TABLE conversations ADD COLUMN oc_session_key TEXT NOT NULL DEFAULT ''"); } catch {}
+  try { db.run("CREATE INDEX IF NOT EXISTS idx_conversations_oc_session_key ON conversations(oc_session_key)"); } catch {}
   try { db.run("CREATE INDEX IF NOT EXISTS idx_conversations_scope ON conversations(scope_type, scope_id)"); } catch {}
 
   // Migrate: drop old agent_id column (SQLite does not support DROP COLUMN before 3.35;

@@ -12,7 +12,10 @@ import { SessionAgentBar } from '@/components/SessionAgentBar';
 import { NewTabModal } from '@/components/NewTabModal';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { conversationsApi } from '@/api/conversations';
+import filesApi, { type FileAsset } from '@/api/files';
 
 /* ── 浏览器标签页类型（与会话绑定） ── */
 interface BrowserTab {
@@ -23,6 +26,20 @@ interface BrowserTab {
   agentName?: string;       // 智能体名称（标题显示用）
   color?: string;           // 智能体颜色
 }
+
+/** 可用的模型列表（用于 Tab 模型切换） */
+const AVAILABLE_MODELS = [
+  { id: 'claude-opus-4-6', label: 'Claude Opus 4.6', provider: 'anthropic' },
+  { id: 'glm-5', label: 'GLM-5', provider: 'zhipu' },
+  { id: 'glm-5.1', label: 'GLM-5.1', provider: 'zhipu' },
+  { id: 'qwen3-max-2026-01-23', label: 'Qwen3 Max', provider: 'alibaba' },
+  { id: 'qwen3.6-plus', label: 'Qwen3.6 Plus', provider: 'alibaba' },
+  { id: 'kimi-k2.5', label: 'Kimi K2.5', provider: 'moonshot' },
+  { id: 'minimax-m2.5', label: 'MiniMax M2.5', provider: 'minimax' },
+  { id: 'doubao-pro-32k', label: 'Doubao Pro 32K', provider: 'doubao' },
+  { id: 'qwen-max', label: 'Qwen Max', provider: 'alibaba' },
+  { id: 'auto', label: '自动选择', provider: 'auto' },
+];
 import {
   SkillPanel,
   SchedulePanel,
@@ -1050,13 +1067,59 @@ function TabPanel({
   /* 根据activePanelId推导当前激活的panel */
   const activePanel = (activePanelId ? openPanels.find(p => p.id === activePanelId) : null) ?? openPanels[0] ?? null;
 
-  /* 文件快传状态 */
-  const [uploadedFiles, setUploadedFiles] = useState<{ name: string; size: string; type: string }[]>([]);
+  /* 文件快传状态（项目级关联） */
+  const [uploadedFiles, setUploadedFiles] = useState<FileAsset[]>([]);
   const [dragOver, setDragOver] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  function simulateUpload(fileName: string) {
-    const ext = fileName.split('.').pop()?.toUpperCase() ?? 'FILE';
-    setUploadedFiles(prev => [...prev, { name: fileName, size: `${(Math.random() * 2 + 0.1).toFixed(1)} MB`, type: ext }]);
+  async function loadProjectFiles() {
+    try {
+      const rows = await filesApi.list(currentProjectId || '', activePanel?.conversationId || '');
+      setUploadedFiles(rows);
+    } catch (e) {
+      console.error('[loadProjectFiles]', e);
+    }
+  }
+
+  async function uploadRealFile(file: File) {
+    setUploading(true);
+    try {
+      const conversationId = activePanel?.conversationId || '';
+      const buffer = await file.arrayBuffer();
+      const bytes = new Uint8Array(buffer);
+      let binary = '';
+      const chunkSize = 0x8000;
+      for (let i = 0; i < bytes.length; i += chunkSize) {
+        binary += String.fromCharCode(...bytes.slice(i, i + chunkSize));
+      }
+      const base64 = btoa(binary);
+      await filesApi.upload({
+        fileName: file.name,
+        mimeType: file.type || 'application/octet-stream',
+        base64,
+        projectId: currentProjectId || '',
+        conversationId,
+      });
+      await loadProjectFiles();
+      showToast('文件上传成功，正在触发智能体初步分析', 'success');
+
+      if (conversationId && onSend) {
+        try {
+          const prompt = await filesApi.getAutoAnalysisPrompt(conversationId);
+          if (prompt.trim()) {
+            onSend(prompt);
+          }
+        } catch (analysisError) {
+          console.error('[uploadRealFile:autoAnalysis]', analysisError);
+        }
+      }
+    } catch (e: any) {
+      console.error('[uploadRealFile]', e);
+      showToast(e?.response?.data?.error?.message || '文件上传失败', 'error');
+    } finally {
+      setUploading(false);
+    }
   }
 
   /* 智能体状态映射 */
@@ -1065,6 +1128,10 @@ function TabPanel({
     idle:   { label: '空闲', color: '#3b82f6' },
     busy:   { label: '忙碌', color: '#f59e0b' },
   };
+
+  useEffect(() => {
+    void loadProjectFiles();
+  }, [currentProjectId, activePanel?.conversationId]);
 
   const meta = TAB_META[tab] ?? {
     gradient: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
@@ -1078,6 +1145,12 @@ function TabPanel({
     marginBottom: 7, fontSize: 13, color: '#374151',
     border: '1px solid #f0f0f0',
   };
+
+  function formatFileSize(sizeBytes: number) {
+    if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) return '0 B';
+    if (sizeBytes < 1024 * 1024) return `${(sizeBytes / 1024).toFixed(1)} KB`;
+    return `${(sizeBytes / 1024 / 1024).toFixed(1)} MB`;
+  }
   const badgeStyle = (color: string): React.CSSProperties => ({
     fontSize: 11, padding: '2px 8px', borderRadius: 4,
     background: color + '18', color,
@@ -1182,63 +1255,93 @@ function TabPanel({
 
           {tab === '文件快传' && (
             <div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls,.csv,.pdf,.docx,.md,.txt,.json"
+                style={{ display: 'none' }}
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (file) await uploadRealFile(file);
+                  e.currentTarget.value = '';
+                }}
+              />
               <div
                 style={{
                   border: `2px dashed ${dragOver ? '#3b82f6' : '#d1d5db'}`,
                   borderRadius: 10, padding: '28px 20px',
-                  textAlign: 'center', cursor: 'pointer',
+                  textAlign: 'center', cursor: uploading ? 'wait' : 'pointer',
                   background: dragOver ? '#f0f7ff' : 'transparent',
                   transition: 'border-color 0.15s, background 0.15s',
+                  opacity: uploading ? 0.75 : 1,
                 }}
                 onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.borderColor = '#3b82f6'; (e.currentTarget as HTMLDivElement).style.background = '#f0f7ff'; }}
                 onMouseLeave={e => { if (!dragOver) { (e.currentTarget as HTMLDivElement).style.borderColor = '#d1d5db'; (e.currentTarget as HTMLDivElement).style.background = 'transparent'; } }}
                 onDragOver={e => { e.preventDefault(); setDragOver(true); }}
                 onDragLeave={() => setDragOver(false)}
-                onDrop={e => {
+                onDrop={async e => {
                   e.preventDefault();
                   setDragOver(false);
-                  Array.from(e.dataTransfer.files).forEach(f => simulateUpload(f.name));
+                  const file = e.dataTransfer.files?.[0];
+                  if (file) await uploadRealFile(file);
                 }}
-                onClick={() => simulateUpload(`示例文档_${Date.now().toString().slice(-4)}.pdf`)}
+                onClick={() => !uploading && fileInputRef.current?.click()}
               >
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="1.5" style={{ margin: '0 auto 8px', display: 'block', opacity: 0.6 }}>
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
                 </svg>
-                <div style={{ fontSize: 13, color: '#6b7280', fontWeight: 500 }}>点击或拖拽文件到此处</div>
-                <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 4 }}>支持 PDF、Word、TXT、Markdown，最大 10MB</div>
+                <div style={{ fontSize: 13, color: '#6b7280', fontWeight: 500 }}>{uploading ? '上传中...' : '点击或拖拽文件到此处'}</div>
+                <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 4 }}>支持 Excel、CSV、PDF、Word、TXT、Markdown、JSON，最大 50MB；项目可为空，后续再关联</div>
               </div>
               {uploadedFiles.length > 0 && (
                 <div style={{ marginTop: 14 }}>
                   <div style={{ fontSize: 12, color: '#6b7280', fontWeight: 600, marginBottom: 8 }}>
                     已上传文件（{uploadedFiles.length}）
                   </div>
-                  {uploadedFiles.map((f, i) => (
-                    <div key={i} style={{ ...itemStyle, marginBottom: 6 }}>
+                  {uploadedFiles.map((f) => (
+                    <div key={f.id} style={{ ...itemStyle, marginBottom: 6 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
                         <div style={{
                           width: 30, height: 30, borderRadius: 6, flexShrink: 0,
                           background: 'linear-gradient(135deg,#3b82f6,#06b6d4)',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           fontSize: 9, color: '#fff', fontWeight: 700,
-                        }}>{f.type}</div>
+                        }}>{(f.extension || '').replace('.', '').toUpperCase() || 'FILE'}</div>
                         <div>
-                          <div style={{ fontSize: 12, fontWeight: 500, color: '#374151' }}>{f.name}</div>
-                          <div style={{ fontSize: 11, color: '#9ca3af' }}>{f.size}</div>
+                          <div style={{ fontSize: 12, fontWeight: 500, color: '#374151' }}>{f.originalName}</div>
+                          <div style={{ fontSize: 11, color: '#9ca3af' }}>{formatFileSize(f.sizeBytes)}</div>
                         </div>
                       </div>
                       <button
-                        onClick={() => setUploadedFiles(prev => prev.filter((_, j) => j !== i))}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: 16, lineHeight: 1, padding: '2px 4px' }}
+                        onClick={async () => {
+                          try {
+                            await filesApi.remove(f.id);
+                            await loadProjectFiles();
+                          } catch (e) {
+                            console.error('[removeProjectFile]', e);
+                            showToast('删除文件失败', 'error');
+                          }
+                        }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: '#9ca3af',
+                          fontSize: 12,
+                          lineHeight: 1,
+                          padding: '4px 6px',
+                          fontWeight: 500,
+                        }}
                         onMouseEnter={e => { e.currentTarget.style.color = '#ef4444'; }}
                         onMouseLeave={e => { e.currentTarget.style.color = '#9ca3af'; }}
-                      >×</button>
+                      >删除</button>
                     </div>
                   ))}
                 </div>
               )}
               {uploadedFiles.length === 0 && (
                 <div style={{ textAlign: 'center', fontSize: 12, color: '#d1d5db', marginTop: 12 }}>
-                  暂无上传文件，上传后将作为智能体上下文参考
+                  暂无上传文件，项目可后续再关联
                 </div>
               )}
             </div>
@@ -1878,16 +1981,14 @@ export function ProjectWorkspace() {
     sessionTabs: storeSessionTabs, activeTabId: storeActiveTabId } = useConversationStore();
   // 统一 Tab 管理（方案 A：sessionTabs 作为唯一数据源）
   const rawSessionTabs = useConversationStore(s => s.sessionTabs);
+  const getTabs = useConversationStore(s => s.getTabs);
   const storeActiveId = useConversationStore(s => s.activeTabId);
   const switchTab = useConversationStore(s => s.switchTab);
   const closeTabFn = useConversationStore(s => s.closeTab);
   const renameTab = useConversationStore(s => s.renameTab);
   const createSessionTabFn = useConversationStore(s => s.createSessionTab);
   const switchAgentFn = useConversationStore(s => s.switchAgent);
-  const allTabs = React.useMemo(() => {
-    const tabs = rawSessionTabs || [];
-    return tabs.map(t => ({ ...t, type: (t.type || 'session') as 'home' | 'session' }));
-  }, [rawSessionTabs]);
+  const allTabs = React.useMemo(() => getTabs(), [rawSessionTabs, getTabs]);
   const activeTab = allTabs.find(t => t.id === storeActiveId);
   const { agents, fetchAgents } = useAgentStore();
   const { addTaskFromChat, tasks, updateTask } = useTaskStore();
@@ -1953,7 +2054,52 @@ export function ProjectWorkspace() {
   const [showNewTabModal, setShowNewTabModal] = useState(false);
   const [restoreReady, setRestoreReady] = useState(false);
 
+  /** 模型切换下拉状态 */
+  const [showModelDropdown, setShowModelDropdown] = useState(false);
+  const [modelDropdownTabId, setModelDropdownTabId] = useState<string | null>(null);
+  const modelDropdownRef = useRef<HTMLDivElement>(null);
+
+  /** 点击外部关闭模型切换下拉 */
+  useEffect(() => {
+    if (!showModelDropdown) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (modelDropdownRef.current && !modelDropdownRef.current.contains(e.target as Node)) {
+        setShowModelDropdown(false);
+        setModelDropdownTabId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showModelDropdown]);
+
   const taskProgress = 68; // 真实进度字段后端暂无，保留占位
+
+  /* ── 上下文使用量计算（仅前端估算，不代表模型真实 usage） ── */
+  const activeAgent = activePanel?.agentId ? agents.find(a => a.id === activePanel.agentId) : null;
+  const activeModelName = activeAgent?.modelName || 'GLM-5';
+  const panelMessages = activePanel?.messages || [];
+  const totalChars = panelMessages.reduce((sum, msg) => sum + (msg.content?.length || 0), 0);
+  const messageCount = panelMessages.length;
+  const draftChars = inputValue.length;
+  // 改为按实际字符长度粗估：
+  // - 中文/混合文本按约 1~1.2 char/token 做保守估算
+  // - 每条消息补少量结构开销
+  // - 再加一小段系统提示/路由开销
+  const estimatedTokens = Math.max(
+    1000,
+    Math.round(totalChars * 1.1 + draftChars * 1.1 + messageCount * 80 + 1500)
+  );
+  const contextLimit = 200000; // 默认 200k
+  const contextUsedK = estimatedTokens >= 1000 ? (estimatedTokens / 1000).toFixed(1).replace(/\.0$/, '') : '1';
+  const contextMaxK = Math.round(contextLimit / 1000);
+  const contextPct = Math.min(100, Math.max(1, Math.round((estimatedTokens / contextLimit) * 100)));
+
+  const formatMessageTime = (value?: string) => {
+    if (!value) return '';
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return '';
+    return d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+  };
 
   /* ── 找到 kanban 中对应的项目（项目模式用来读写 tags/priority）── */
   const allKanbanProjects = [...kanbanProjects.progress, ...kanbanProjects.done];
@@ -2049,6 +2195,9 @@ export function ProjectWorkspace() {
   }, [showPriorityDropdown]);
 
   /* ── 初始化：加载项目 + 智能体列表 + WS 连接 + 恢复会话 ── */
+  // Day 2 修复:taskStore 和 projectKanbanStore 的 restoreFromPersist() 此前从未被调用，
+  // 导致任务看板/项目看板刷新后始终为空（数据源只靠 addTask/addProject 局部写入，不拉后端存量数据）。
+  // 现在在 conversationStore 恢复完成后，链式触发任务和项目看板的数据恢复。
   useEffect(() => {
     fetchProjects();
     fetchAgents();
@@ -2074,6 +2223,11 @@ export function ProjectWorkspace() {
     }).catch(() => {
       setRestoreReady(true);
     });
+
+    // Day 2: 任务看板恢复（此前从未调用，刷新后任务列表丢失）
+    useTaskStore.getState().restoreFromPersist().catch(() => {});
+    // Day 2: 项目看板恢复（此前从未调用，刷新后项目看板为空）
+    useProjectKanbanStore.getState().restoreFromPersist().catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -2128,19 +2282,38 @@ export function ProjectWorkspace() {
   }, [allTabs, storeActiveId]);
 
   /* ── 消息列表滚动到底部 ─────────────────────────────────── */
+  const welcomeAreaRef = useRef<HTMLDivElement | null>(null);
   const prevMsgCountRef = useRef(0);
+  const lastScrollHeightRef = useRef(0);
+
   useEffect(() => {
     const msgCount = activePanel?.messages?.length || 0;
-    // 只在新增消息时自动滚动（消息数增加），流式更新内容时不触发滚动，
-    // 否则大量内容流式输出时 smooth scroll 会与内容增长打架，导致页面上下闪烁
+    const isStreaming = activePanel?.isStreaming;
+    const scrollContainer = welcomeAreaRef.current;
+
+    // 流式输出时：持续跟随到底部（用 scrollTop 直接设置，避免 smooth scroll 与内容增长打架）
+    // 每次内容增长最多只触发一次滚动，不会高频抖动
+    if (isStreaming && scrollContainer) {
+      const currentScrollHeight = scrollContainer.scrollHeight;
+      // 只在 scrollHeight 真正增长时滚动，避免无意义重复调用
+      if (currentScrollHeight > lastScrollHeightRef.current + 20) {
+        scrollContainer.scrollTop = currentScrollHeight;
+        lastScrollHeightRef.current = currentScrollHeight;
+      }
+    }
+
+    // 新消息完成时：平滑滚动到底部
     if (msgCount > prevMsgCountRef.current) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      if (scrollContainer) lastScrollHeightRef.current = scrollContainer.scrollHeight;
     } else if (msgCount < prevMsgCountRef.current) {
       // 消息减少（如清除/重新加载）时瞬间滚动
       messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+      if (scrollContainer) lastScrollHeightRef.current = scrollContainer.scrollHeight;
     }
+
     prevMsgCountRef.current = msgCount;
-  }, [activePanel?.messages]);
+  }, [activePanel?.messages, activePanel?.isStreaming]);
 
   /* ── 发送消息 ─────────────────────────────────────────────── */
   async function handleSend() {
@@ -2158,17 +2331,27 @@ export function ProjectWorkspace() {
       agentName = activePanel.agentName;
       agentColor = activePanel.agentColor ?? '#9ca3af';
     } else if (!activePanel || activePanel.id.startsWith('local-')) {
-      // 没有 panel 或 panel 是本地临时面板：用第一个可用智能体自动开启一个会话
+      // 没有 panel 或 panel 是本地临时面板：必须通过 createSessionTabFn 建会话。
+      //
+      // ⚠️ 关键回归 BUG（2026-05-06）：
+      // 之前这里直接调用 openPanel，只会创建 openPanels，不会创建 sessionTabs。
+      // 而刷新恢复的 UI 真相源恰恰是 sessionTabs（openPanels 不再持久化）。
+      // 结果就是：用户首条消息能正常聊，但因为没有持久化 tab，刷新后看起来像“会话全丢”。
       const defaultAgent = agents[0];
       if (defaultAgent) {
-        await openPanel({
+        const newTabId = await createSessionTabFn({
           agentId: defaultAgent.id,
           agentName: defaultAgent.name,
           agentColor: defaultAgent.color,
-          projectId: currentProject?.id,
+          title: defaultAgent.name,
         });
-        const freshPanel = useConversationStore.getState().openPanels[0];
+        const state = useConversationStore.getState();
+        const hitTab = state.sessionTabs.find(t => t.id === newTabId);
+        const freshPanel = hitTab?.panelId
+          ? state.openPanels.find(p => p.id === hitTab.panelId)
+          : state.openPanels[0];
         if (freshPanel) {
+          setActivePanelId(freshPanel.id);
           sendMessage(freshPanel.id, text);
           panelId = freshPanel.id;
         }
@@ -2215,7 +2398,7 @@ export function ProjectWorkspace() {
       <style>{`
         .workspace-body {
           width: 100%; height: 100%; background: #f5f7fa;
-          padding: 16px; box-sizing: border-box; display: flex; flex-direction: column;
+          padding: 0 16px 16px; box-sizing: border-box; display: flex; flex-direction: column;
         }
         .layout-container {
           flex: 1; min-height: 0;
@@ -2241,6 +2424,7 @@ export function ProjectWorkspace() {
         }
         .welcome-area {
           flex: 1; min-height: 0; background: #ffffff; overflow-y: auto; overflow-x: hidden;
+          scroll-behavior: auto; /* 流式输出时用 scrollTop 直接控制，不要 CSS smooth */
         }
         .function-tabs {
           display: flex; gap: 8px; padding: 10px 20px; flex-wrap: wrap;
@@ -2259,19 +2443,19 @@ export function ProjectWorkspace() {
         }
         .resize-bar {
           display: flex; align-items: center; justify-content: center;
-          height: 8px; cursor: ns-resize; border-radius: 4px 4px 0 0;
-          background: transparent; transition: background 0.15s;
+          height: 10px; cursor: ns-resize; border-radius: 6px 6px 0 0;
+          background: rgba(140,111,255,0.06); transition: background 0.15s;
           margin-bottom: -1px;
         }
         .resize-bar:hover { background: rgba(140,111,255,0.15); }
         .resize-bar::after {
-          content: ''; width: 40px; height: 3px; border-radius: 2px;
-          background: #d1d5db; transition: background 0.15s;
+          content: ''; width: 48px; height: 4px; border-radius: 999px;
+          background: #c4b5fd; transition: background 0.15s;
         }
         .resize-bar:hover::after { background: #8c6fff; }
         .main-input {
           width: 100%; padding: 12px 50px 12px 14px; border: 1px solid #d9d9d9;
-          border-radius: 0 0 8px 8px; min-height: 140px; max-height: 300px; resize: none; background: #ffffff;
+          border-radius: 0 0 8px 8px; min-height: 96px; max-height: 300px; resize: none; background: #ffffff;
           font-size: 14px; font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
           color: #1a1d23; line-height: 1.6; box-sizing: border-box; outline: none;
           transition: border-color 0.15s, box-shadow 0.15s;
@@ -2302,6 +2486,41 @@ export function ProjectWorkspace() {
           background: #ebedf0; overflow: hidden; box-sizing: border-box;
         }
         .progress-fill { height: 100%; border-radius: 99px; transition: width 0.6s ease; }
+        .workspace-tabbar {
+          display: flex; align-items: flex-end; min-height: 46px; padding: 0; flex-shrink: 0;
+          overflow-x: auto; gap: 4px; background: #fafbfc; box-sizing: border-box;
+          scrollbar-width: none; -ms-overflow-style: none;
+        }
+        .workspace-tabbar::-webkit-scrollbar { display: none; }
+        .workspace-tab {
+          display: flex; align-items: center; gap: 8px;
+        }
+        .workspace-tab-title {
+          overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 160px;
+        }
+        .workspace-tab-close {
+          display: flex; align-items: center; justify-content: center;
+          width: 20px; height: 20px; border-radius: 6px; opacity: 0.4;
+          cursor: pointer; transition: all 0.15s; margin-left: 4px;
+        }
+        .workspace-tab-add {
+          display: flex; align-items: center; justify-content: center;
+          width: 36px; height: 36px; background: transparent; border: 1px dashed #d1d5db;
+          border-radius: 8px; cursor: pointer; color: #9ca3af; flex-shrink: 0;
+          transition: all 0.2s; margin-bottom: 4px;
+        }
+        .workspace-message-row { display: flex; margin-bottom: 12px; }
+        .workspace-message-row.is-user { justify-content: flex-end; }
+        .workspace-message-row.is-agent { justify-content: flex-start; }
+        .workspace-message-wrap { max-width: 72%; }
+        .workspace-message-meta {
+          display: flex; align-items: center; gap: 6px; margin-bottom: 4px;
+          font-size: 11px; color: #9ca3af;
+        }
+        .workspace-message-bubble {
+          max-width: 100%; padding: 8px 14px; font-size: 13px; line-height: 1.6;
+          word-break: break-word; overflow-wrap: break-word;
+        }
         @keyframes pulse {
           0%, 100% { opacity: 1; transform: scale(1); }
           50% { opacity: 0.5; transform: scale(1.4); }
@@ -2330,8 +2549,9 @@ export function ProjectWorkspace() {
           font-family: 'Menlo','Consolas','Courier New',monospace;
         }
         .markdown-body pre {
-          background: #1e293b;
-          color: #e2e8f0;
+          background: #f5f5f5;
+          border: 1px solid #e5e5e5;
+          color: #1a1a1a;
           padding: 12px;
           border-radius: 6px;
           overflow-x: auto;
@@ -2370,15 +2590,103 @@ export function ProjectWorkspace() {
           background: rgba(255,255,255,0.15);
         }
         .bubble-dark .markdown-body pre {
-          background: #1a1a2e;
+          background: rgba(255,255,255,0.1);
+          border-color: rgba(255,255,255,0.2);
+          color: #f0f0f0;
         }
         .bubble-dark .markdown-body blockquote {
           border-left-color: rgba(255,255,255,0.3);
           color: rgba(255,255,255,0.7);
         }
         @media (max-width: 768px) {
-          .workspace-body { padding: 8px; }
-          .content-header { flex-direction: column; align-items: flex-start; gap: 6px; }
+          .workspace-body { padding: 0 !important; }
+          .layout-container { border-radius: 0 !important; min-height: 100%; }
+          .content-header {
+            flex-direction: column; align-items: flex-start; gap: 6px;
+            padding: 12px 14px !important;
+          }
+          .workspace-tabbar {
+            min-height: 42px !important;
+            padding: 0 8px !important;
+            gap: 6px !important;
+          }
+          .workspace-tab {
+            min-width: 96px !important;
+            max-width: 180px;
+            padding: 10px 12px 8px !important;
+            gap: 6px !important;
+            font-size: 13px !important;
+          }
+          .workspace-tab-title { max-width: 92px !important; }
+          .workspace-tab-close {
+            opacity: 1 !important;
+            width: 18px !important;
+            height: 18px !important;
+            margin-left: 0 !important;
+          }
+          .workspace-tab-add {
+            width: 32px !important;
+            height: 32px !important;
+            margin: 0 0 4px 0 !important;
+          }
+          .welcome-area.has-messages { padding: 12px 12px 20px !important; }
+          .workspace-message-row { margin-bottom: 10px !important; }
+          .workspace-message-wrap { max-width: 88% !important; }
+          .workspace-message-meta { flex-wrap: wrap !important; gap: 4px 6px !important; }
+          .workspace-message-bubble {
+            padding: 8px 10px !important;
+            font-size: 13px !important;
+          }
+          .function-tabs {
+            gap: 6px !important;
+            padding: 8px 10px !important;
+            flex-wrap: nowrap !important;
+            overflow-x: auto !important;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+          }
+          .function-tabs::-webkit-scrollbar { display: none; }
+          .function-tab {
+            flex-shrink: 0;
+            white-space: nowrap;
+          }
+          .input-container {
+            padding: 12px 10px calc(10px + env(safe-area-inset-bottom)) !important;
+          }
+          .resize-bar { display: none !important; }
+          .main-input {
+            min-height: 84px !important;
+            max-height: 180px !important;
+            font-size: 16px !important;
+            padding: 12px 46px 12px 12px !important;
+            border-radius: 10px !important;
+          }
+          .send-btn {
+            right: 20px !important;
+            bottom: calc(18px + env(safe-area-inset-bottom)) !important;
+            width: 34px !important;
+            height: 34px !important;
+          }
+          .progress-bar-area {
+            padding: 8px 10px calc(10px + env(safe-area-inset-bottom)) !important;
+          }
+          .progress-bar-header {
+            gap: 8px !important;
+            align-items: flex-start !important;
+          }
+          .progress-bar-label {
+            font-size: 11px !important;
+            line-height: 1.4;
+          }
+          .progress-bar-pct {
+            font-size: 11px !important;
+            flex-shrink: 0;
+          }
+          .markdown-body table {
+            display: block;
+            overflow-x: auto;
+            white-space: nowrap;
+          }
         }
       `}</style>
 
@@ -2386,17 +2694,18 @@ export function ProjectWorkspace() {
         <div className="layout-container">
 
           {/* ── 浏览器风格多标签栏 ── */}
-          <div style={{ display: 'flex', alignItems: 'flex-end', padding: '12px 16px 0', flexShrink: 0, overflowX: 'auto', gap: 4, background: '#fafbfc' }}>
+          <div className="workspace-tabbar" style={{ display: 'flex', alignItems: 'flex-end', minHeight: 46, padding: '0', flexShrink: 0, overflowX: 'auto', gap: 4, background: '#fafbfc', boxSizing: 'border-box' }}>
             {allTabs.map((tab) => {
               const isActive = tab.id === storeActiveId;
               const hasSession = tab.type === 'session' && !!tab.panelId;
               return (
                 <div
                   key={tab.id}
+                  className="workspace-tab"
                   onClick={() => switchTab(tab.id)}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 8,
-                    padding: isActive ? '14px 20px 12px' : '12px 18px 10px',
+                    padding: isActive ? '14px 20px 10px' : '12px 18px 10px',
                     background: isActive ? '#fff' : 'transparent',
                     borderRadius: '8px 8px 0 0',
                     border: isActive ? '1px solid #e5e7eb' : '1px solid transparent',
@@ -2406,10 +2715,23 @@ export function ProjectWorkspace() {
                     fontSize: 14, fontWeight: isActive ? 600 : 500,
                     transition: 'all 0.2s ease',
                     boxShadow: isActive ? '0 -2px 8px rgba(0,0,0,0.06)' : 'none',
-                    position: 'relative', marginBottom: -1,
+                    position: 'relative',
+                    marginBottom: isActive ? -3 : -1,
                   }}
-                  onMouseEnter={(e) => { if (!isActive) { e.currentTarget.style.background = '#f3f4f6'; e.currentTarget.style.color = '#374151'; } }}
-                  onMouseLeave={(e) => { if (!isActive) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#6b7280'; } }}
+                  onMouseEnter={(e) => {
+                    if (!isActive) {
+                      e.currentTarget.style.background = '#f3f4f6';
+                      e.currentTarget.style.color = '#374151';
+                      e.currentTarget.style.boxShadow = '0 -2px 8px rgba(0,0,0,0.06)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isActive) {
+                      e.currentTarget.style.background = 'transparent';
+                      e.currentTarget.style.color = '#6b7280';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }
+                  }}
                 >
                   {/* 会话状态指示器 */}
                   {hasSession ? (
@@ -2453,12 +2775,14 @@ export function ProjectWorkspace() {
                         setEditingTabId(tab.id);
                         setEditingTabTitle(tab.title);
                       }}
+                      className="workspace-tab-title"
                       style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 160 }}
                       title="双击重命名"
                     >{tab.title}</span>
                   )}
                   {tab.type !== 'home' && (
                     <span
+                      className="workspace-tab-close"
                       onClick={(e) => { e.stopPropagation(); closeTabFn(tab.id); }}
                     style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20, borderRadius: 6, opacity: 0.4, cursor: 'pointer', transition: 'all 0.15s', marginLeft: 4 }}
                     onMouseEnter={(e) => { e.stopPropagation(); e.currentTarget.style.background = '#fee2e2'; e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = '#ef4444'; }}
@@ -2471,6 +2795,7 @@ export function ProjectWorkspace() {
               );
             })}
             <button
+              className="workspace-tab-add"
               onClick={() => setShowNewTabModal(true)}
               style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, background: 'transparent', border: '1px dashed #d1d5db', borderRadius: 8, cursor: 'pointer', color: '#9ca3af', flexShrink: 0, transition: 'all 0.2s', marginBottom: 4 }}
               onMouseEnter={(e) => { e.currentTarget.style.background = '#f3f4f6'; e.currentTarget.style.borderColor = '#9ca3af'; e.currentTarget.style.color = '#6b7280'; }}
@@ -2479,6 +2804,92 @@ export function ProjectWorkspace() {
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 3V13M3 8H13" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
             </button>
+
+            {/* 模型切换下拉选择 */}
+            {showModelDropdown && modelDropdownTabId && (() => {
+              const targetTab = allTabs.find(t => t.id === modelDropdownTabId);
+              const targetAgent = targetTab?.agentId ? agents.find(a => a.id === targetTab.agentId) : null;
+              if (!targetAgent) return null;
+              return createPortal(
+                <div
+                  ref={modelDropdownRef}
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    position: 'fixed', top: 60, left: '50%', transform: 'translateX(-50%)',
+                    background: '#fff', borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
+                    padding: 12, minWidth: 200, zIndex: 1000,
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8, fontWeight: 500 }}>
+                    切换智能体模型
+                  </div>
+                  <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 10 }}>
+                    当前: {targetAgent.modelName || '未设置'}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {AVAILABLE_MODELS.map(model => {
+                      const isSelected = targetAgent.modelName === model.id;
+                      return (
+                        <button
+                          key={model.id}
+                          onClick={async () => {
+                            try {
+                              await fetch(`/api/agents/${targetAgent.id}`, {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ modelName: model.id }),
+                              });
+                              await fetchAgents();
+                              setShowModelDropdown(false);
+                              setModelDropdownTabId(null);
+                              showToast('模型已更新为 ' + model.label);
+                            } catch (err) {
+                              showToast('更新模型失败');
+                            }
+                          }}
+                          style={{
+                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                            padding: '8px 12px', borderRadius: 8,
+                            border: isSelected ? '1.5px solid #2563eb' : '1px solid #e5e7eb',
+                            background: isSelected ? '#f0f5ff' : '#fff',
+                            cursor: 'pointer', transition: 'all 0.15s',
+                            fontSize: 13, color: isSelected ? '#2563eb' : '#374151',
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!isSelected) {
+                              e.currentTarget.style.background = '#f3f4f6';
+                              e.currentTarget.style.borderColor = '#d1d5db';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!isSelected) {
+                              e.currentTarget.style.background = '#fff';
+                              e.currentTarget.style.borderColor = '#e5e7eb';
+                            }
+                          }}
+                        >
+                          <span>{model.label}</span>
+                          {isSelected && <span style={{ fontSize: 11 }}>✓</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <button
+                    onClick={() => { setShowModelDropdown(false); setModelDropdownTabId(null); }}
+                    style={{
+                      marginTop: 12, padding: '6px 12px', borderRadius: 8,
+                      border: '1px solid #e5e7eb', background: '#fff',
+                      fontSize: 12, color: '#6b7280', cursor: 'pointer',
+                      width: '100%', textAlign: 'center',
+                    }}
+                  >
+                    取消
+                  </button>
+                </div>,
+                document.body
+              );
+            })()}
           </div>
 
           {/* ══════════ 对话工作台 ══════════ */}
@@ -2519,8 +2930,14 @@ export function ProjectWorkspace() {
               }}
             />
           )}
-          {/* 2. 消息展示区：panel 层叠保留，但只展示当前激活 tab 对应的 panel */}
-          <div className="welcome-area" style={{ padding: messages.length ? '16px 24px' : 0, position: 'relative' }}>
+          {/*
+            2. 消息展示区：panel 层叠保留，但只展示当前激活 tab 对应的 panel
+            关键体验修复（2026-05-06）：
+            - 底部保留适度留白，避免最后一条消息紧贴输入区
+            - 消息恢复显示“智能体名称 + 时间”元信息
+            - 流式输出时恢复可见光标反馈，避免误以为流式失效
+          */}
+          <div ref={welcomeAreaRef} className={`welcome-area ${messages.length ? 'has-messages' : 'is-empty'}`} style={{ padding: messages.length ? '16px 24px 32px' : 0, position: 'relative' }}>
             {openPanels.map((panel) => {
               const isActivePanel = activePanel?.id === panel.id;
               const panelMessages = panel.messages ?? [];
@@ -2546,34 +2963,99 @@ export function ProjectWorkspace() {
                       <span style={{ fontSize: 13 }}>输入消息与智能体开始对话</span>
                     </div>
                   )}
-                  {panelMessages.map((msg) => (
-                    <div key={msg.id} style={{
-                      display: 'flex',
-                      justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
-                      marginBottom: 10,
-                    }}>
-                      <div style={{
-                        maxWidth: '72%', padding: '8px 14px',
-                        borderRadius: msg.role === 'user' ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
-                        background: msg.role === 'user' ? '#2a3b4d' : '#f3f4f6',
-                        color: msg.role === 'user' ? '#fff' : '#1a202c',
-                        fontSize: 13, lineHeight: 1.6,
-                        wordBreak: 'break-word',
-                        overflowWrap: 'break-word',
+                  {panelMessages.map((msg) => {
+                    const isStreamingMessage = Boolean(msg.streaming || panel.streamingMessageId === msg.id);
+                    const msgAgent = msg.role === 'user'
+                      ? null
+                      : (msg.agentId ? agents.find(a => a.id === msg.agentId) : null) || { name: panel.agentName, color: panel.agentColor, modelName: undefined as string | undefined };
+                    const metaLabel = msg.role === 'user' ? '你' : (msgAgent?.name || panel.agentName || '智能体');
+                    const metaTime = formatMessageTime(msg.createdAt);
+
+                    return (
+                      <div key={msg.id} className={`workspace-message-row ${msg.role === 'user' ? 'is-user' : 'is-agent'}`} style={{
+                        display: 'flex',
+                        justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                        marginBottom: 12,
                       }}>
-                        {msg.content ? (
-                          <div className="markdown-body" style={{ ...(msg.role === 'user' ? { color: '#fff' } : {}) }}>
-                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                              {msg.content}
-                            </ReactMarkdown>
+                        <div className="workspace-message-wrap" style={{ maxWidth: '72%' }}>
+                          <div className="workspace-message-meta" style={{
+                            display: 'flex',
+                            justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                            alignItems: 'center',
+                            gap: 6,
+                            marginBottom: 4,
+                            fontSize: 11,
+                            color: '#9ca3af',
+                          }}>
+                            <span style={{ color: msg.role === 'user' ? '#6b7280' : (msgAgent?.color || '#6b7280'), fontWeight: 600 }}>
+                              {metaLabel}
+                            </span>
+                            {msg.role !== 'user' && msgAgent?.modelName && (
+                              <span style={{
+                                display: 'inline-flex', alignItems: 'center', gap: 2,
+                                padding: '1px 6px', borderRadius: 8,
+                                background: '#f3f4f6', border: '1px solid #e5e7eb',
+                                fontSize: 10, color: '#6b7280', fontWeight: 500,
+                              }}>
+                                {msgAgent.modelName}
+                              </span>
+                            )}
+                            {metaTime && <span>{metaTime}</span>}
                           </div>
-                        ) : (
-                          <span style={{ opacity: 0.4 }}>●●●</span>
-                        )}
+                          <div className="workspace-message-bubble" style={{
+                            maxWidth: '100%', padding: '8px 14px',
+                            borderRadius: msg.role === 'user' ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
+                            background: msg.role === 'user' ? '#2a3b4d' : '#f3f4f6',
+                            color: msg.role === 'user' ? '#fff' : '#1a202c',
+                            fontSize: 13, lineHeight: 1.6,
+                            wordBreak: 'break-word',
+                            overflowWrap: 'break-word',
+                          }}>
+                            {msg.content ? (
+                              <div className={`markdown-body${msg.role === 'user' ? ' bubble-dark' : ''}`} style={{ ...(msg.role === 'user' ? { color: '#fff' } : {}) }}>
+                                <ReactMarkdown
+                                  remarkPlugins={[remarkGfm]}
+                                  components={{
+                                    code: ({ node, inline, className, children, ...props }: any) => {
+                                      const match = /language-(\w+)/.exec(className || '');
+                                      const language = match ? match[1] : 'text';
+                                      if (inline) {
+                                        return <code className={className} {...props}>{children}</code>;
+                                      }
+                                      return (
+                                        <SyntaxHighlighter
+                                          style={oneLight}
+                                          language={language}
+                                          PreTag="div"
+                                          {...props}
+                                        >
+                                          {String(children).trimEnd()}
+                                        </SyntaxHighlighter>
+                                      );
+                                    }
+                                  }}
+                                >
+                                  {msg.content}
+                                </ReactMarkdown>
+                                {isStreamingMessage && (
+                                  <span style={{ display: 'inline-block', marginLeft: 4, opacity: 0.7, color: '#8c6fff', fontWeight: 700 }}>|</span>
+                                )}
+                              </div>
+                            ) : (
+                              <span style={{ opacity: 0.45 }}>{isStreamingMessage ? '正在生成...' : '●●●'}</span>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                  {isActivePanel && <div ref={messagesEndRef} />}
+                    );
+                  })}
+                  {isActivePanel && (
+                    <>
+                      {/* 真实底部留白：保留一点呼吸感即可，避免最后一条消息贴输入区 */}
+                      <div style={{ height: 6, flexShrink: 0 }} />
+                      <div ref={messagesEndRef} />
+                    </>
+                  )}
                 </div>
               );
             })}
@@ -2604,7 +3086,9 @@ export function ProjectWorkspace() {
                 const startH = ta.offsetHeight;
                 const onMove = (ev: MouseEvent) => {
                   const delta = startY - ev.clientY;
-                  const newH = Math.min(300, Math.max(140, startH + delta));
+                  // 关键修复：之前最小高度锁在 140，首屏默认高度本身就接近这个值，
+                  // 实际效果就是“只能往上拉，几乎不能往下压”。
+                  const newH = Math.min(300, Math.max(96, startH + delta));
                   ta.style.height = newH + 'px';
                 };
                 const onUp = () => {
@@ -2630,17 +3114,17 @@ export function ProjectWorkspace() {
             </button>
           </div>
 
-          {/* 5. 项目进度条 */}
+          {/* 5. 上下文使用进度条 */}
           <div className="progress-bar-area">
             <div className="progress-bar-header">
-              <span className="progress-bar-label">{taskName} · 完成进度</span>
-              <span className="progress-bar-pct" style={{ color: progressColor }}>{taskProgress}%</span>
+              <span className="progress-bar-label">{activeModelName} · 估算上下文 约 {contextUsedK}k / {contextMaxK}k</span>
+              <span className="progress-bar-pct" style={{ color: progressColor }}>{contextPct}%</span>
             </div>
             <div className="progress-track">
               <div
                 className="progress-fill"
                 style={{
-                  width: `${taskProgress}%`,
+                  width: `${contextPct}%`,
                   background: `linear-gradient(90deg, ${progressColor}88, ${progressColor})`,
                 }}
               />
@@ -2717,7 +3201,9 @@ export function ProjectWorkspace() {
             closePanel(panelId);
             setActivePanelId(prev => prev === panelId ? (openPanels.find(p => p.id !== panelId)?.id ?? null) : prev);
           }}
-          currentProjectId={matchedKanbanProject?.id}
+          // 文件快传必须拿“当前工作区项目真值”，不能只依赖 matchedKanbanProject。
+          // 否则用户明明已在项目工作区中，但如果当前视图没有命中看板项目对象，上传层会误判为“未进入项目”。
+          currentProjectId={currentProject?.id || matchedKanbanProject?.id}
           collabNodes={collabNodes}
           setCollabNodes={setCollabNodes}
           isProject={isProjectMode}

@@ -24,6 +24,7 @@ import { requestLogger } from './middleware/requestLogger';
 import { apiLimiter, authLimiter } from './middleware/rateLimiter';
 import { setupWebSocket } from './ws/wsHandler';
 import * as AgentBridge from './services/AgentBridge';
+import { clawBotClient } from './services/ClawBotGatewayClient';
 
 // 环境变量配置
 const PORT = process.env.PORT || 3001;
@@ -48,6 +49,14 @@ async function main(): Promise<void> {
     logger.error('[AgentBridge] Startup sync failed:', err.message);
   }
 
+  // 1.6 初始化 OpenClaw Gateway WebSocket 客户端
+  try {
+    clawBotClient.connect();
+    logger.info("[ClawBotGateway] WebSocket client initialized");
+  } catch (err: any) {
+    logger.warn("[ClawBotGateway] Failed to initialize WS client: " + err.message);
+  }
+
   // 2. 创建 Express 应用
   const app = express();
 
@@ -67,7 +76,7 @@ async function main(): Promise<void> {
   app.use('/api/auth', authLimiter);
 
   // 3.8 Phase 1：全局 JWT 鉴权（排除登录注册和 OpenAI 兼容接口）
-  const publicPaths = ['/auth', '/v1', '/health'];
+  const publicPaths = ['/auth', '/v1', '/health', '/wechat-clawbot'];
   app.use('/api', (req, res, next) => {
     if (publicPaths.some(p => req.path.startsWith(p))) return next();
     authenticate(req, res, next);
@@ -93,44 +102,30 @@ async function main(): Promise<void> {
   const server = http.createServer(app);
   setupWebSocket(server);
 
-  // 10. 监听端口错误（EADDRINUSE 等）— 必须绑定在 listen 之前
-  //    ⚠️ 修复：server.listen 的 error 事件是异步 emit 的，不会被 main().catch() 捕获
-  //    不加此 handler 会导致 unhandled exception → process 崩溃 → systemd 无限重启
-  //
-  //    🐛 历史 Bug（2026-05-04 crash loop）：
-  //    旧代码在 EADDRINUSE 分支中，即使成功杀掉旧进程并 setTimeout 重试，
-  //    仍然会执行到下方的 process.exit(1)，导致每次重启都立刻退出 → systemd 无限循环。
-  //    修复：只有在真正无法恢复时才 exit(1)，成功安排了重试就直接 return。
+  // 10. 监听端口错误（EADDRINUSE 等）
   server.on('error', (err: NodeJS.ErrnoException) => {
     if (err.code === 'EADDRINUSE') {
-      logger.error(`[Server] Port ${PORT} is already in use. Another instance may be running.`);
-      logger.error('[Server] Attempting to kill stale process...');
-      // 尝试找出并杀掉占用端口的进程
+      logger.error(`[Server] Port ${PORT} is already in use.`);
       const { execSync } = require('child_process');
       try {
-        const output = execSync(`lsof -t -i :${PORT} 2>/dev/null || ss -tlnp "sport = :${PORT}" | grep -oP 'pid=\\K\\d+' | head -1`, { encoding: 'utf-8' }).trim();
+        const output = execSync(`lsof -t -i :${PORT} 2>/dev/null || ss -tlnp "sport = :${PORT}" | grep -oP 'pid=\K\d+' | head -1`, { encoding: 'utf-8' }).trim();
         if (output) {
           const pid = output.split('\n')[0];
           logger.warn(`[Server] Found stale process PID=${pid} on port ${PORT}, killing...`);
           process.kill(parseInt(pid), 'SIGTERM');
-          // 等待端口释放后重试
           setTimeout(() => {
             logger.info(`[Server] Retrying to listen on port ${PORT}...`);
             server.listen(PORT);
           }, 2000);
-          // ✅ 关键修复：已经安排了重试，直接 return，不要执行 process.exit(1)
-          // 否则当前进程退出 → systemd 又拉起新进程 → 端口仍然被占 → 无限循环
           return;
         }
       } catch (e) {
-        logger.error('[Server] Failed to identify stale process', { error: (e as Error).message });
+        logger.error('[Server] Failed to identify stale process');
       }
-      // 只有无法识别/无法杀掉占用进程时，才退出
       logger.error(`[Server] Cannot bind to port ${PORT}. Manual intervention required.`);
       process.exit(1);
       return;
     }
-    // 其他类型的 server error，记录后退出
     logger.error('[Server] Server error', { code: err.code, message: err.message });
     process.exit(1);
   });
@@ -145,25 +140,29 @@ async function main(): Promise<void> {
     logger.info('='.repeat(60));
   });
 
-  // 12. 优雅关闭 — 修复：无 SIGTERM handler 导致 systemd stop 时直接 SIGKILL
-  //     旧进程未正确释放端口 → 新进程 EADDRINUSE → 无限重启循环
+  // 12. 优雅关闭
   let isShuttingDown = false;
   async function gracefulShutdown(signal: string): Promise<void> {
     if (isShuttingDown) return;
     isShuttingDown = true;
     logger.info(`[Server] Received ${signal}, shutting down gracefully...`);
 
-    // 停止接收新连接
-    server.close(async () => {
+    try {
+      // 先断开 Gateway WebSocket，避免 close 事件再次触发重连
+      clawBotClient.disconnect();
+    } catch (err: any) {
+      logger.warn('[Server] Failed to disconnect ClawBot client during shutdown: ' + err.message);
+    }
+
+    // 不等待 server.close 回调，避免长连接/SSE 卡住退出
+    server.close(() => {
       logger.info('[Server] HTTP server closed');
-      process.exit(0);
     });
 
-    // 超时强制退出（systemd DefaultTimeoutStopSec 默认 90s）
     setTimeout(() => {
-      logger.error('[Server] Graceful shutdown timed out, forcing exit');
-      process.exit(1);
-    }, 10_000).unref();
+      logger.info('[Server] Shutdown complete');
+      process.exit(0);
+    }, 500).unref();
   }
 
   process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
@@ -174,7 +173,6 @@ async function main(): Promise<void> {
  * 配置全局中间件
  */
 function setupGlobalMiddleware(app: express.Application): void {
-  // CORS 跨域支持
   app.use(cors({
     origin: CORS_ORIGIN,
     credentials: true,
@@ -182,19 +180,9 @@ function setupGlobalMiddleware(app: express.Application): void {
     allowedHeaders: ['Content-Type', 'Authorization'],
   }));
 
-  // Body 解析
-  app.use(express.json({ 
-    limit: '10mb',
-    // 严格模式：只接受对象和数组
-    strict: true,
-  }));
-  
-  app.use(express.urlencoded({ 
-    extended: true, 
-    limit: '10mb' 
-  }));
+  app.use(express.json({ limit: '10mb', strict: true }));
+  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-  // 请求日志（开发环境）
   if (NODE_ENV === 'development') {
     app.use((req, res, next) => {
       const timestamp = new Date().toISOString();
@@ -208,7 +196,6 @@ function setupGlobalMiddleware(app: express.Application): void {
  * 配置健康检查端点
  */
 function setupHealthCheck(app: express.Application): void {
-  // 基础健康检查
   app.get('/health', (req, res) => {
     res.json({
       status: 'ok',
@@ -219,31 +206,17 @@ function setupHealthCheck(app: express.Application): void {
     });
   });
 
-  // 详细健康检查（可扩展为检查数据库、外部服务等）
   app.get('/health/detail', async (req, res) => {
-    const checks = {
-      database: 'unknown',
-      timestamp: new Date().toISOString(),
-    };
-
-    // 数据库连接检查
+    const checks = { database: 'unknown', timestamp: new Date().toISOString() };
     try {
       const db = getDb();
-      // 简单查询验证连接
       db.exec('SELECT 1');
       checks.database = 'ok';
     } catch (error) {
       checks.database = 'error';
     }
-
-    const allOk = Object.values(checks).every(
-      (v) => v === 'ok' || v === 'unknown' || typeof v === 'string'
-    );
-
-    res.status(allOk ? 200 : 503).json({
-      status: allOk ? 'ok' : 'degraded',
-      checks,
-    });
+    const allOk = Object.values(checks).every((v) => v === 'ok' || v === 'unknown' || typeof v === 'string');
+    res.status(allOk ? 200 : 503).json({ status: allOk ? 'ok' : 'degraded', checks });
   });
 }
 
@@ -251,35 +224,36 @@ function setupHealthCheck(app: express.Application): void {
  * 配置静态文件服务
  */
 function setupStaticFiles(app: express.Application): void {
-  // 始终提供前端构建文件（开发和生产环境都需要）
   const staticPath = path.join(__dirname, '../../frontend/dist');
   if (require('fs').existsSync(staticPath)) {
-    app.use(express.static(staticPath));
-
-    // SPA 路由回退：所有非 API 请求返回 index.html
-    app.get('*', (req, res, next) => {
-      // API 请求不处理
-      if (
-        req.path.startsWith('/api') ||
-        req.path.startsWith('/v1') ||
-        req.path.startsWith('/ws') ||
-        req.path.startsWith('/health')
-      ) {
-        return next();
-      }
-      // 禁用 index.html 缓存，确保每次加载最新 JS
+    const indexFile = path.join(staticPath, 'index.html');
+    const sendIndexNoCache = (res: express.Response) => {
       res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.set('Pragma', 'no-cache');
       res.set('Expires', '0');
-      res.sendFile(path.join(staticPath, 'index.html'));
+      res.sendFile(indexFile);
+    };
+    app.get('/', (req, res) => sendIndexNoCache(res));
+    app.get('/index.html', (req, res) => sendIndexNoCache(res));
+    app.use(express.static(staticPath, {
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.html')) {
+          res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+          res.setHeader('Pragma', 'no-cache');
+          res.setHeader('Expires', '0');
+          return;
+        }
+        if (filePath.includes('/assets/')) {
+          res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=3600');
+        }
+      },
+    }));
+    app.get('*', (req, res, next) => {
+      if (req.path.startsWith('/api') || req.path.startsWith('/v1') || req.path.startsWith('/ws') || req.path.startsWith('/health')) {
+        return next();
+      }
+      sendIndexNoCache(res);
     });
-
-    // JS/CSS 等静态资源：设置 1 天缓存但允许 revalidate
-    app.get('/assets/*', (req, res, next) => {
-      res.set('Cache-Control', 'public, max-age=86400, stale-while-revalidate=3600');
-      next();
-    });
-
     logger.info('[Static] Serving frontend from: ' + staticPath);
   } else {
     logger.info('[Static] Frontend dist not found at: ' + staticPath);
@@ -289,34 +263,23 @@ function setupStaticFiles(app: express.Application): void {
 // 启动应用
 main().catch((err) => {
   logger.error('[Fatal] Server startup failed:', err);
+  if (err instanceof Error && err.stack) {
+    logger.error('[Fatal] Stack trace:', { stack: err.stack });
+  }
   process.exit(1);
 });
 
-// 全局未捕获异常/拒绝处理 — 防止未预期的 error 导致静默崩溃
-// ⚠️ 防循环重启：不直接 exit，先判断严重性。
-//    如果是 EADDRINUSE 等可恢复错误，让 process 继续运行。
-//    只有真正的致命错误才 exit(1)，避免 systemd 无限重启循环。
-const FATAL_EXIT_ERRORS = new Set([
-  'MODULE_NOT_FOUND',
-  'ERR_REQUIRE_ESM',
-]);
+// 全局未捕获异常处理
+const FATAL_EXIT_ERRORS = new Set(['MODULE_NOT_FOUND', 'ERR_REQUIRE_ESM']);
 
 process.on('uncaughtException', (err) => {
   const errnoErr = err as NodeJS.ErrnoException;
-  // 端口冲突已经在 server.on('error') 中处理了，这里跳过
   if (errnoErr.code === 'EADDRINUSE') return;
-
   logger.error('[Process] Uncaught exception', { message: err.message, stack: err.stack });
-  // 只有致命错误才 exit，其余交给 logger 后保持运行
-  // 这样不会因为单个请求的偶发异常导致整个服务崩溃 → systemd 无限重启
   const shouldExit = errnoErr.code && FATAL_EXIT_ERRORS.has(errnoErr.code as string);
-  if (shouldExit) {
-    process.exit(1);
-  }
+  if (shouldExit) { process.exit(1); }
 });
 
 process.on('unhandledRejection', (reason) => {
   logger.error('[Process] Unhandled rejection', { reason: String(reason) });
-  // 不 exit — unhandledRejection 通常是某个异步操作被忽略的 catch，
-  // 不代表整个进程不可用。直接 exit 会导致不必要的重启循环。
 });

@@ -28,6 +28,7 @@ router.get("/:id", authenticate, (req: Request, res: Response) => {
 // POST /api/agent-templates/:id/create — 基于模板创建 Agent
 const CreateSchema = z.object({
   name: z.string().min(1).optional(),
+  agentType: z.enum(['dev', 'data', 'creative', 'pm', 'research', 'ops', 'decision', 'general']).optional(),
   modelName: z.string().optional(),
   modelProvider: z.string().optional(),
   temperature: z.number().optional(),

@@ -253,7 +253,7 @@ export const ConversationService = {
     }
     saveDb();
     return rowToConversation(
-      { id: conversationId, project_id: data.projectId || null, task_id: taskId, session_code: sessionCode, current_agent_id: currentAgentId, current_agent_code: currentAgentCode, title, status: 'in_progress', scope_type: scopeType, scope_id: scopeId, memory_policy: memoryPolicy, summary: '', last_message_at: '', created_by: data.createdBy || null, created_at: now },
+      { id: conversationId, project_id: data.projectId || null, task_id: taskId, session_code: sessionCode, current_agent_id: currentAgentId, current_agent_code: currentAgentCode, title, status: 'in_progress', scope_type: scopeType, scope_id: scopeId, memory_policy: memoryPolicy, summary: '', last_message_at: '', user_id: userUuid, created_by: data.createdBy || null, created_at: now },
       data.agentIds.map(resolveBusinessAgentId)
     );
   },
@@ -286,6 +286,7 @@ export const ConversationService = {
       `UPDATE conversations SET current_agent_id = ?, current_agent_code = ?, agent_id = ? WHERE id = ?`,
       [businessAgentId, currentAgentCode, businessAgentId, conversationId]
     );
+    const mainChanges = db.getRowsModified(); // ✅ 立即捕获主更新的行数
 
     // 2) 清理旧 agent，只保留新 agent（防止 conversation_agents 积累多个 agent 导致前端显示两个智能体）
     db.run(`DELETE FROM conversation_agents WHERE conversation_id = ?`, [conversationId]);
@@ -297,9 +298,9 @@ export const ConversationService = {
     // 3) 同步 agent_ids 快照列
     syncConversationAgentSnapshot(db, conversationId);
 
-    const changes = db.getRowsModified();
     saveDb();
-    return changes > 0;
+    // ✅ 使用主更新的行数判断成功，或简单地返回 true（因为前置校验已确保 conv/agent 存在）
+    return mainChanges > 0;
   },
 
   /**
@@ -482,5 +483,49 @@ export const ConversationService = {
         summary: conv.summary,
       };
     });
+  },
+
+  /**
+   * 绑定 RC 会话与 OpenClaw session key。
+   *
+   * 关键原因：RC 只在 conversations 里存 UUID 不够，
+   * OpenClaw 还需要一个带 agent 前缀的 session key 才能落到正确 agent 目录。
+   * 这里同时更新：
+   * 1) conversations.oc_session_key（当前主映射，便于排障）
+   * 2) session_mapping（允许一个 RC conversation 对应多个 OC agent session）
+   */
+  bindOpenClawSession(conversationId: string, ocSessionKey: string, agentId: string, agentIds?: string[]): void {
+    const db = getDb();
+    const now = new Date().toISOString();
+    const normalizedAgentIds = Array.from(new Set((agentIds && agentIds.length ? agentIds : [agentId]).filter(Boolean)));
+
+    db.run(
+      `UPDATE conversations SET oc_session_key=? WHERE id=?`,
+      [ocSessionKey, conversationId]
+    );
+
+    const existing = execToRows(
+      db,
+      `SELECT id FROM session_mapping WHERE oc_session_key=?`,
+      [ocSessionKey]
+    )[0];
+
+    if (existing?.id) {
+      db.run(
+        `UPDATE session_mapping
+         SET conversation_id=?, agent_id=?, agent_ids=?, channel='repaceclaw', updated_at=?
+         WHERE oc_session_key=?`,
+        [conversationId, agentId, JSON.stringify(normalizedAgentIds), now, ocSessionKey]
+      );
+    } else {
+      db.run(
+        `INSERT INTO session_mapping
+         (id, oc_session_key, conversation_id, session_file, agent_id, agent_ids, channel, created_at, updated_at)
+         VALUES (?,?,?,?,?,?,?,?,?)`,
+        [uuidv4(), ocSessionKey, conversationId, '', agentId, JSON.stringify(normalizedAgentIds), 'repaceclaw', now, now]
+      );
+    }
+
+    saveDb();
   },
 };

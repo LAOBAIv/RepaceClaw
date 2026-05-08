@@ -7,9 +7,24 @@
  * 不再使用 MOCK 数据，所有会话来自 RepaceClaw 后端数据库
  */
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
 import { conversationsApi } from '../api/conversations';
 import { useAgentStore } from './agentStore';
+
+const PLATFORM_ASSISTANT_IDS = new Set([
+  'platform-assistant',
+  'repaceclaw-platform-assistant',
+  '24cf6cc5-da0d-48df-814e-11582e398007',
+]);
+
+const isPlatformAssistantConversation = (conv: {
+  currentAgentId?: string;
+  agentId?: string;
+  agentIds?: string[];
+  title?: string;
+}) => {
+  const ids = [conv.currentAgentId, conv.agentId, ...(conv.agentIds || [])].filter(Boolean) as string[];
+  return ids.some(id => PLATFORM_ASSISTANT_IDS.has(id)) || conv.title === 'RepaceClaw 平台助手';
+};
 
 /* ─── 类型 ─────────────────────────────────────────────────── */
 /** 会话看板卡片（从 Conversation 转换而来） */
@@ -76,7 +91,6 @@ interface SessionKanbanState {
 
 /* ─── Store 实现 ───────────────────────────────────────────── */
 export const useSessionKanbanStore = create<SessionKanbanState>()(
-  persist(
     (set) => ({
       sessions: EMPTY_BOARD,
       loading: false,
@@ -103,6 +117,9 @@ export const useSessionKanbanStore = create<SessionKanbanState>()(
           const addedIds = new Set<string>();
 
           for (const conv of conversations) {
+            // 平台助手是独立入口服务，不进入会话列表/会话看板。
+            if (isPlatformAssistantConversation(conv)) continue;
+
             // ⚡ 去重
             if (addedIds.has(conv.id)) continue;
             addedIds.add(conv.id);
@@ -173,6 +190,11 @@ export const useSessionKanbanStore = create<SessionKanbanState>()(
           };
           return { sessions: newSessions };
         });
+        // 方案 C: 广播会话删除事件（conversationStore closeTab 也会广播，但此处是直接删除入口）
+        import("../lib/sync").then(({ getBroadcastSync }) => {
+          const bc = getBroadcastSync();
+          if (bc) bc.send('session.closed', { conversationId: sessionId });
+        }).catch(() => {});
       },
 
       updateSessionStatus: (sessionId, status) => {
@@ -204,28 +226,11 @@ export const useSessionKanbanStore = create<SessionKanbanState>()(
           }
           return { sessions: newSessions };
         });
+        // 方案 C: 广播会话状态变更（用 session.closed 标记从活跃区移除）
+        import("../lib/sync").then(({ getBroadcastSync }) => {
+          const bc = getBroadcastSync();
+          if (bc) bc.send('session.closed', { conversationId: sessionId, status });
+        }).catch(() => {});
       },
     }),
-    {
-      // ⚠️ 防跨用户数据串扰：storage key 按用户隔离
-      name: (() => {
-        try {
-          const auth = JSON.parse(localStorage.getItem('repaceclaw-auth') || '{}');
-          const uid = auth?.state?.user?.id;
-          return uid ? `wb-session-kanban-store-${uid}` : 'wb-session-kanban-store-v4';
-        } catch {
-          return 'wb-session-kanban-store-v4';
-        }
-      })(),
-      version: 4,
-      storage: createJSONStorage(() => sessionStorage),
-      migrate: (persistedState: any, version: number) => {
-        // v3 及之前没有 deleted 列，补齐
-        if (persistedState?.sessions) {
-          persistedState.sessions.deleted = persistedState.sessions.deleted || [];
-        }
-        return persistedState;
-      },
-    }
-  )
 );

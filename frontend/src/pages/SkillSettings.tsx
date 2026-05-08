@@ -99,8 +99,8 @@ export function SkillSettings() {
         .ss-shell{flex:1;min-height:0;display:flex;flex-direction:column;
           background:#fafbfc;border:1px solid #e5e6eb;border-radius:12px;
           box-shadow:0 1px 4px rgba(0,0,0,.05);overflow:hidden}
-        .ss-header{padding:16px 32px;border-bottom:1px solid #e5e6eb;background:#fff;
-          display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+        .ss-header{padding:16px 32px;min-height:58px;border-bottom:1px solid #e5e6eb;background:#fff;
+          display:flex;align-items:center;justify-content:space-between;flex-shrink:0;box-sizing:border-box}
         .ss-header-left{display:flex;align-items:center;gap:10px}
         .ss-btn{display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;
           border:none;background:#2a3b4d;color:#fff;font-weight:600;font-size:13px;

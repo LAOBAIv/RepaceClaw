@@ -31,18 +31,28 @@ export const VALID_MODELS = [
   'claude-opus-4-6',
   'glm-5',
   'glm-5.1',
+  'glm5',
   'qwen3-max-2026-01-23',
   'kimi-k2.5',
   'minimax-m2.5',
   'qwen3.6-plus',
   'geographer',
+  'doubao-pro-32k',
+  'qwen-max',
+  'auto',
 ];
 
-/** 模糊匹配模型名（忽略大小写） */
-function isValidModelName(modelName: string): boolean {
+/**
+ * 后台“无效模型”只应作为弱提示，绝不能因为静态白名单落后而误伤真实可用模型。
+ * 规则：
+ * 1. 若后端 routing-overview 已成功给出 effectiveModel，视为有效
+ * 2. 否则再做宽松字符串匹配（忽略大小写/常见别名）
+ */
+function isValidModelName(modelName: string, routing?: AgentRoutingInfo): boolean {
   if (!modelName) return true;
+  if (routing?.effectiveModel) return true;
   const lower = modelName.toLowerCase().trim();
-  return VALID_MODELS.some(v => lower === v || lower.startsWith(v));
+  return VALID_MODELS.some(v => lower === v || lower.startsWith(v) || v.startsWith(lower));
 }
 
 /** Skill 配置项 */
@@ -60,7 +70,7 @@ const SKILL_ITEMS: { key: string; label: string; risk: 'high' | 'medium' | 'low'
 function ModelParamBar({ agent, routing }: { agent: Agent; routing?: AgentRoutingInfo }) {
   const channel = agent.tokenProvider;
   const model   = agent.modelName;
-  const isValidModel = isValidModelName(model);
+  const isValidModel = isValidModelName(model, routing);
 
   // 路由来源标识
   const sourceLabel = routing ? {
@@ -269,10 +279,12 @@ export function AgentManager() {
         }
         .am-header {
           padding: 16px 32px;
+          min-height: 58px;
           border-bottom: 1px solid #e5e6eb;
           background: #fff;
           display: flex; align-items: center; justify-content: space-between;
           flex-shrink: 0;
+          box-sizing: border-box;
         }
         .am-header-left { display: flex; align-items: center; gap: 10px; }
         .am-header-btn {
@@ -283,36 +295,43 @@ export function AgentManager() {
           font-family: inherit; transition: background 0.15s;
         }
         .am-header-btn:hover { background: #1e2d3d; }
-        .am-scroll { flex: 1; overflow-y: auto; padding: 24px; }
+        .am-scroll {
+          flex: 1;
+          overflow-y: auto;
+          overflow-x: hidden;
+          padding: 14px 20px 16px;
+          box-sizing: border-box;
+        }
         .am-grid {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
-          gap: 18px;
+          gap: 14px;
         }
         .am-item {
-          padding: 18px 20px;
+          padding: 16px;
           background: #ffffff;
-          border: 1px solid #e5e5e5;
+          border: 1px solid #e5e7eb;
           border-radius: 12px;
           cursor: pointer;
           transition: border-color 0.15s, box-shadow 0.15s;
           display: flex; flex-direction: column; gap: 10px;
+          min-height: 220px;
         }
         .am-item:hover {
-          border-color: #b0b0b0;
+          border-color: #cfd6df;
           box-shadow: 0 2px 10px rgba(0,0,0,0.06);
         }
         .am-item-top { display: flex; align-items: center; gap: 10px; }
         .am-item-new {
           padding: 20px;
           background: #ffffff;
-          border: 1px dashed #c8c8c8;
+          border: 1px dashed #c8cfd8;
           border-radius: 12px;
           cursor: pointer;
           display: flex; align-items: center; justify-content: center; gap: 8px;
           transition: border-color 0.15s, box-shadow 0.15s;
-          color: #999999; font-size: 14px;
-          min-height: 96px;
+          color: #94a3b8; font-size: 14px;
+          min-height: 220px;
         }
         .am-item-new:hover {
           border-color: #2a3b4d;
@@ -325,19 +344,20 @@ export function AgentManager() {
           white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
         .am-style {
-          font-size: 11px; color: #9ca3af; margin-top: 1px;
+          font-size: 11px; color: #9ca3af; margin-top: 2px;
         }
         .am-desc {
-          font-size: 13px; color: #666666;
+          font-size: 12px; color: #6b7280;
           line-height: 1.6;
           display: -webkit-box;
           -webkit-line-clamp: 2;
           -webkit-box-orient: vertical;
           overflow: hidden;
+          min-height: 38px;
         }
-        .am-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+        .am-tags { display: flex; flex-wrap: wrap; gap: 6px; }
         .am-tag {
-          padding: 2px 8px; border-radius: 20px; font-size: 11px;
+          padding: 2px 8px; border-radius: 999px; font-size: 11px;
           background: #f3f4f6; color: #6b7280; border: 1px solid #e5e7eb;
         }
         /* ── 卡片操作区 ── */
@@ -458,10 +478,11 @@ export function AgentManager() {
         /* ── 模型参数区 ── */
         .am-model-bar {
           display: flex; align-items: center; gap: 6px;
-          padding: 7px 10px;
+          padding: 8px 10px;
           background: #f8f9fb;
-          border: 1px solid #eff0f2;
+          border: 1px solid #edf0f3;
           border-radius: 8px;
+          margin-top: auto;
         }
         .am-model-channel {
           font-size: 11.5px; font-weight: 600; color: #374151;
@@ -482,7 +503,7 @@ export function AgentManager() {
         }
         @media (max-width: 560px) {
           .am-grid { grid-template-columns: 1fr; }
-          .am-scroll { padding: 16px; }
+          .am-scroll { padding: 14px 16px 16px; }
           .am-header { padding: 14px 16px; }
         }
       `}</style>
@@ -494,24 +515,21 @@ export function AgentManager() {
           <div className="am-header">
             <div className="am-header-left">
               <Bot size={18} color="#2a3b4d" />
-              <div>
+              <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
                 <span style={{ fontWeight: 700, fontSize: 16, color: '#1a202c' }}>智能体管理</span>
                 <span style={{ fontSize: 12, color: '#9ca3af', marginLeft: 10 }}>
                   {loading ? '正在加载智能体...' : `共 ${agentList.length} 个智能体`}
                 </span>
               </div>
             </div>
-            <button className="am-header-btn" onClick={() => navigate('/agent-create')}>
-              <Plus size={14} /> 新建智能体
-            </button>
           </div>
 
           {/* 卡片列表 */}
           <div className="am-scroll">
             {loading ? (
-              <div style={{ padding: 32, textAlign: 'center', color: '#9ca3af', fontSize: 13 }}>正在加载智能体...</div>
+              <div style={{ padding: 40, textAlign: 'center', color: '#9ca3af', fontSize: 13, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12 }}>正在加载智能体...</div>
             ) : agentList.length === 0 ? (
-              <div style={{ padding: 32, textAlign: 'center', color: '#9ca3af', fontSize: 13 }}>暂无智能体，点击右上角创建一个吧</div>
+              <div style={{ padding: 40, textAlign: 'center', color: '#9ca3af', fontSize: 13, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12 }}>暂无智能体，点击右上角创建一个吧</div>
             ) : (
             <div className="am-grid">
               {agentList.map(agent => (
@@ -550,7 +568,7 @@ export function AgentManager() {
                       <div className="am-name" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                         {agent.name}
                         <VisibilityBadge visibility={agent.visibility} />
-                        {agent.modelName && !isValidModelName(agent.modelName) && (
+                        {agent.modelName && !isValidModelName(agent.modelName, getRouting(agent.id)) && (
                           <span style={{
                             display: 'inline-flex', alignItems: 'center', gap: 3,
                             padding: '1px 6px', borderRadius: 10,

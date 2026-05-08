@@ -2,11 +2,13 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { authApi } from "../api/auth";
 import { useAuthStore } from "../stores/authStore";
+import { initTabSession, clearUserData, clearAllRcStorage } from "../lib/storageScope";
 
 type Mode = "login" | "register";
 
 export function AuthPage() {
   const navigate = useNavigate();
+  const fromPath = (window.history.state?.usr as any)?.fromPath || '/workspace';
   const { login } = useAuthStore();
   const [mode, setMode] = useState<Mode>("login");
   const [loading, setLoading] = useState(false);
@@ -39,7 +41,7 @@ export function AuthPage() {
     try {
       let result;
       if (mode === "login") {
-        result = await authApi.login({ email: form.email, password: form.password });
+        result = await authApi.login({ identifier: form.email.trim(), password: form.password });
       } else {
         result = await authApi.register({
           username: form.username,
@@ -48,19 +50,29 @@ export function AuthPage() {
         });
       }
       login(result.user, result.token);
-      // ⚠️ 清理旧用户的所有 store 缓存，防止跨用户数据串扰
+      // Plan C 登录竞态修复：authStore 已迁移到 sessionStorage，
+      // 这里后面又会立刻整页跳转到 /workspace。
+      // 不能只依赖 zustand persist 的异步/内部写入时机，
+      // 必须先把最小认证快照同步写入 sessionStorage，避免首屏被误判为未登录。
+      sessionStorage.setItem('repaceclaw-auth', JSON.stringify({
+        state: {
+          user: result.user,
+          token: result.token,
+          isAuthenticated: true,
+        },
+        version: 0,
+      }));
+      // Plan C: 初始化 tabId（确保 sessionStorage 中有 tabId）
+      initTabSession();
+      // 清理旧用户的缓存，防止跨用户数据串扰
+      // - localStorage: 清历史遗留 key
+      // - rc: 前缀: 清当前 tab / 调试残留的 Plan C 缓存
       // zustand persist 的 name 在模块加载时执行一次，不会随登录动态更新
       // 必须清理后刷新，让新用户的 key 生效
-      const keysToRemove: string[] = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && (key.startsWith('wb-') || key.startsWith('repaceclaw-conversations-') || key.startsWith('repaceclaw-'))) {
-          if (key !== 'repaceclaw-auth') keysToRemove.push(key);
-        }
-      }
-      keysToRemove.forEach(k => localStorage.removeItem(k));
+      clearUserData();
+      clearAllRcStorage();
       // 强制刷新页面，store 用新用户的 auth 重新初始化
-      window.location.replace('/workspace');
+      window.location.replace(fromPath);
     } catch (err: any) {
       setError(err.response?.data?.error || "操作失败，请重试");
     } finally {
@@ -137,10 +149,10 @@ export function AuthPage() {
             )}
 
             <div>
-              <label style={{ display: "block", fontSize: 13, color: "#9ca3af", marginBottom: 6 }}>邮箱</label>
+              <label style={{ display: "block", fontSize: 13, color: "#9ca3af", marginBottom: 6 }}>账号</label>
               <input
-                name="email" type="email" value={form.email}
-                onChange={handleChange} placeholder="请输入邮箱" required
+                name="email" type="text" value={form.email}
+                onChange={handleChange} placeholder={mode === "login" ? "请输入邮箱或用户名" : "请输入邮箱"} required
                 style={inputStyle}
               />
             </div>

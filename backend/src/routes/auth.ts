@@ -36,18 +36,19 @@ router.post("/register", async (req: Request, res: Response) => {
 // POST /api/auth/login
 router.post("/login", async (req: Request, res: Response) => {
   try {
-    const { email, password } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({ error: "邮箱和密码不能为空" });
+    const { email, username, identifier, password } = req.body;
+    const loginIdentifier = String(identifier || email || username || "").trim();
+    if (!loginIdentifier || !password) {
+      return res.status(400).json({ error: "账号和密码不能为空" });
     }
-    const result = await UserService.login({ email, password });
+    const result = await UserService.login({ identifier: loginIdentifier, password });
     // 审计日志
     AuditService.log({
       userId: result.user.id,
       action: 'login',
       resource: 'user',
       resourceId: result.user.id,
-      detail: { email },
+      detail: { identifier: loginIdentifier },
       ipAddress: req.ip,
       userAgent: req.headers['user-agent'],
       requestId: (req as any).requestId,
@@ -63,6 +64,18 @@ router.get("/me", authenticate, (req: Request, res: Response) => {
   const user = UserService.getUserById((req as any).user.id);
   if (!user) return res.status(404).json({ error: "用户不存在" });
   res.json(user);
+});
+
+// PUT /api/auth/me — 当前用户修改个人资料
+router.put("/me", authenticate, (req: Request, res: Response) => {
+  try {
+    const { username, avatar } = req.body;
+    const user = UserService.updateProfile((req as any).user.id, { username, avatar });
+    if (!user) return res.status(404).json({ error: "用户不存在" });
+    res.json(user);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 // PUT /api/auth/password — 修改密码

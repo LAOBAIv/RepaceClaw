@@ -11,22 +11,34 @@
  * 不能再维护一套页面私有 WS 生命周期。
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Send, Bot, User, Loader2, Wifi, WifiOff } from 'lucide-react';
+import { Send, Bot, Loader2, Wifi, WifiOff } from 'lucide-react';
 import apiClient from '@/api/client';
 import { sendConversationMessageOverWs, subscribeConversationWs, useConversationStore } from '@/stores/conversationStore';
-
-interface Message {
-  id: string;
-  role: 'user' | 'agent';
-  content: string;
-  createdAt: string;
-}
+import { MessageBubble } from '@/components/conversation/MessageBubble';
+import type { Message } from '@/types';
 
 interface Conversation {
   id: string;
   title: string;
   agentIds: string[];
   messages: Message[];
+}
+
+function normalizePlatformAssistantContent(content: string): string {
+  if (!content) return content;
+
+  // 历史污染兼容：平台助手曾经被错误写成“预览+完整代码”输出模式，
+  // 而本页面又长期直接裸渲染 msg.content，导致用户直接看到：
+  // - 预览
+  // - 完整答复
+  // - 完整说明
+  // 这里先做前端兜底清洗，避免旧消息和偶发脏值继续把结构性标签暴露给用户。
+  return content
+    .replace(/^预览[：:]?\s*/i, '')
+    .replace(/^完整答复[：:]?\s*/i, '')
+    .replace(/^完整说明[：:]?\s*/i, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 export function PlatformAssistant() {
@@ -44,7 +56,7 @@ export function PlatformAssistant() {
   useEffect(() => {
     let cancelled = false;
     apiClient.get('/conversations/platform-assistant')
-      .then(res => {
+      .then((res) => {
         if (!cancelled && res.data.data) {
           const conv = res.data.data;
           setConversation(conv);
@@ -100,9 +112,11 @@ export function PlatformAssistant() {
           if (prev.some(m => m.id === data.messageId)) return prev;
           return [...prev, {
             id: data.messageId,
+            conversationId: conversation.id,
             role: 'agent',
             content: '',
             createdAt: new Date().toISOString(),
+            streaming: true,
           }];
         });
       }
@@ -147,6 +161,7 @@ export function PlatformAssistant() {
 
     const optimisticMsg: Message = {
       id: `optimistic-${Date.now()}`,
+      conversationId: conversation.id,
       role: 'user',
       content,
       createdAt: new Date().toISOString(),
@@ -179,7 +194,7 @@ export function PlatformAssistant() {
     return (
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        height: '100vh', background: '#f9fafb',
+        flex: 1, minHeight: 0, background: '#f5f7fa',
       }}>
         <div style={{ textAlign: 'center' }}>
           <Loader2 className="w-8 h-8 animate-spin text-indigo-500 mx-auto mb-3" />
@@ -190,11 +205,11 @@ export function PlatformAssistant() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#f9fafb' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: '#f5f7fa', overflow: 'hidden' }}>
       {/* Header */}
       <div style={{
         padding: '16px 24px',
-        background: '#fff',
+        background: '#fafbfc',
         borderBottom: '1px solid #e5e7eb',
         display: 'flex',
         alignItems: 'center',
@@ -227,8 +242,11 @@ export function PlatformAssistant() {
         </div>
       </div>
 
-      {/* Messages — 底部加 padding 防止与输入框重叠 */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '24px 24px 100px' }}>
+      {/*
+        消息区必须放在可收缩容器里，不能继续拿视口高度做基准。
+        否则首次进入 /platform-assistant 时，顶部用户栏 + 页面 header 会把输入框挤出可视区。
+      */}
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '24px 24px 24px', background: '#ffffff' }}>
         {messages.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px 20px' }}>
             <div style={{
@@ -248,68 +266,18 @@ export function PlatformAssistant() {
           </div>
         ) : (
           messages.map(msg => (
-            <div
+            <MessageBubble
               key={msg.id}
-              style={{
-                display: 'flex',
-                justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
-                marginBottom: 16,
+              message={{
+                ...msg,
+                content: msg.role === 'agent' ? normalizePlatformAssistantContent(msg.content) : msg.content,
               }}
-            >
-              <div style={{
-                display: 'flex',
-                gap: 10,
-                maxWidth: '70%',
-                flexDirection: msg.role === 'user' ? 'row-reverse' : 'row',
-              }}>
-                <div style={{
-                  width: 30, height: 30, borderRadius: 8, flexShrink: 0,
-                  background: msg.role === 'user' ? '#3b82f6' : 'linear-gradient(135deg, #3b82f6, #6366f1)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
-                  {msg.role === 'user'
-                    ? <User className="w-4 h-4 text-white" />
-                    : <Bot className="w-4 h-4 text-white" />
-                  }
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  {/* 智能体名字和时间 */}
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    flexDirection: msg.role === 'user' ? 'row-reverse' : 'row',
-                  }}>
-                    <span style={{
-                      fontSize: 12,
-                      fontWeight: 500,
-                      color: msg.role === 'user' ? '#3b82f6' : '#6b7280',
-                    }}>
-                      {msg.role === 'user' ? '我' : '平台助手'}
-                    </span>
-                    <span style={{
-                      fontSize: 11,
-                      color: '#9ca3af',
-                    }}>
-                      {msg.createdAt ? new Date(msg.createdAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : ''}
-                    </span>
-                  </div>
-                  {/* 消息内容 */}
-                  <div style={{
-                    padding: '10px 14px',
-                    borderRadius: 12,
-                    background: msg.role === 'user' ? '#3b82f6' : '#fff',
-                    color: msg.role === 'user' ? '#fff' : '#1f2937',
-                    fontSize: 13.5,
-                    lineHeight: 1.6,
-                    whiteSpace: 'pre-wrap',
-                    border: msg.role === 'agent' ? '1px solid #e5e7eb' : 'none',
-                  }}>
-                    {msg.content || <Loader2 className="w-4 h-4 animate-spin" />}
-                  </div>
-                </div>
-              </div>
-            </div>
+              agentName={msg.role === 'agent' ? '平台助手' : undefined}
+              agentColor="#3b82f6"
+              showAvatar
+              outputFormat="Markdown"
+              variant="workspace"
+            />
           ))
         )}
         <div ref={messagesEndRef} style={{ height: 20 }} />
@@ -318,7 +286,7 @@ export function PlatformAssistant() {
       {/* Input */}
       <div style={{
         padding: '16px 24px',
-        background: '#fff',
+        background: '#fafbfc',
         borderTop: '1px solid #e5e7eb',
         flexShrink: 0,
       }}>
@@ -326,7 +294,7 @@ export function PlatformAssistant() {
           display: 'flex',
           gap: 10,
           alignItems: 'flex-end',
-          background: '#f9fafb',
+          background: '#f5f7fa',
           border: '1px solid #e5e7eb',
           borderRadius: 12,
           padding: '8px 12px',
@@ -353,18 +321,23 @@ export function PlatformAssistant() {
           />
           <button
             onClick={sendMessage}
-            disabled={!input.trim() || sending || !wsConnected}
+            disabled={!input.trim() || sending}
+            title={wsConnected ? '发送' : '连接中，点击后会自动重连并发送'}
             style={{
               width: 34, height: 34, borderRadius: 10,
               border: 'none',
-              background: input.trim() && !sending && wsConnected ? '#3b82f6' : '#e5e7eb',
-              color: input.trim() && !sending && wsConnected ? '#fff' : '#9ca3af',
-              cursor: input.trim() && !sending && wsConnected ? 'pointer' : 'not-allowed',
+              // 关键修复：平台助手发送层本身已内置 ensureWsOpen() 自动补连逻辑，
+              // 这里不能再因为 wsConnected=false 就把发送按钮直接禁掉。
+              // 旧行为会造成“按钮失效/灰掉”，用户连触发重连发送的机会都没有。
+              background: input.trim() && !sending ? '#3b82f6' : '#e5e7eb',
+              color: input.trim() && !sending ? '#fff' : '#9ca3af',
+              cursor: input.trim() && !sending ? 'pointer' : 'not-allowed',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               flexShrink: 0,
               transition: 'all 0.15s',
+              opacity: wsConnected ? 1 : 0.85,
             }}
           >
             {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send size={16} />}

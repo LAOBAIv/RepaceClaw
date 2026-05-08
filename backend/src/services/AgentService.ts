@@ -6,6 +6,7 @@ import { IdGenerator } from '../utils/IdGenerator';
 import { OpenClawAdapter } from "./llm/OpenClawAdapter";
 import { ILLMAdapter } from "./llm/LLMAdapter";
 import * as AgentBridge from "./AgentBridge";
+import { toOpenClawAgentId } from './AgentBridge/AgentMapper';
 
 
 export interface Agent {
@@ -55,6 +56,11 @@ export interface Agent {
 }
 
 function rowToAgent(obj: any): Agent {
+  const isPlatformAssistant = obj.id === 'platform-assistant'
+    || obj.id === 'repaceclaw-platform-assistant'
+    || obj.id === '24cf6cc5-da0d-48df-814e-11582e398007'
+    || obj.openclaw_agent_id === 'repaceclaw-platform-assistant';
+
   return {
     id: obj.id,
     agentCode: obj.agent_code || undefined,
@@ -76,7 +82,12 @@ function rowToAgent(obj: any): Agent {
     tokenProvider: obj.token_provider || "",
     tokenApiKey: obj.token_api_key || "",
     tokenBaseUrl: obj.token_base_url || "",
-    outputFormat: obj.output_format || "纯文本",
+    // 平台助手不再强制“纯文本”，改为统一走 Markdown 友好输出。
+    // 但必须继续禁止回落到“预览+完整代码”，否则会再次出现：
+    // - 预览
+    // - 完整答复
+    // 因此这里仍做服务层兜底：平台助手统一按 Markdown 读取。
+    outputFormat: isPlatformAssistant ? 'Markdown' : (obj.output_format || '纯文本'),
     boundary: obj.boundary || "",
     memoryTurns: obj.memory_turns ?? 0,
     temperatureOverride: obj.temperature_override ?? null,
@@ -146,7 +157,7 @@ function buildPlatformAssistantAgent(): Agent {
     tokenProvider: '',
     tokenApiKey: '',
     tokenBaseUrl: '',
-    outputFormat: '纯文本',
+    outputFormat: 'Markdown',
     boundary: '仅回答平台功能、操作说明、使用帮助，不代替用户业务智能体执行私人任务。',
     memoryTurns: 0,
     temperatureOverride: null,
@@ -162,11 +173,17 @@ function buildPlatformAssistantAgent(): Agent {
 
 export const AgentService = {
   isPlatformAssistantId(id?: string | null) {
-    // 同时识别 UUID、硬编码字符串、alias，兼容迁移前后
+    // 同时识别 alias / 旧硬编码 UUID / 运行时真实 DB id，兼容迁移前后。
     if (!id) return false;
-    return id === 'platform-assistant'
-      || id === 'repaceclaw-platform-assistant'
-      || id === '24cf6cc5-da0d-48df-814e-11582e398007';  // DB 平台助手 UUID
+    if (id === 'platform-assistant' || id === 'repaceclaw-platform-assistant' || id === '24cf6cc5-da0d-48df-814e-11582e398007') {
+      return true;
+    }
+    try {
+      const runtime = buildPlatformAssistantAgent();
+      return id === runtime.id || id === runtime.agentCode || id === runtime.openclawAgentId;
+    } catch {
+      return false;
+    }
   },
   list(userId?: string): Agent[] {
     const db = getDb();
@@ -286,15 +303,17 @@ export const AgentService = {
 
     // Phase 3: 默认配额
     const quotaConfig = data.quotaConfig || {};
+    const agentType = data.agentType || 'general';
+    const openclawAgentId = data.openclawAgentId || toOpenClawAgentId(agentType);
 
     db.run(
       `INSERT INTO agents (id, agent_code, name, color, system_prompt, writing_style, expertise, description, status,
         model_name, model_provider, temperature, max_tokens, top_p, frequency_penalty, presence_penalty,
         token_provider, token_api_key, token_base_url,
         output_format, boundary, memory_turns, temperature_override, user_id,
-        visibility, skills_config, quota_config, agent_type,
+        visibility, skills_config, quota_config, openclaw_agent_id, agent_type,
         created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id, agentCode, data.name, data.color, data.systemPrompt, data.writingStyle,
         JSON.stringify(data.expertise), data.description || "", data.status || "idle",
@@ -308,7 +327,8 @@ export const AgentService = {
         data.visibility || "private",
         JSON.stringify(skillsConfig),
         JSON.stringify(quotaConfig),
-        data.agentType || 'general',
+        openclawAgentId,
+        agentType,
         now,
       ]
     );
@@ -331,12 +351,26 @@ export const AgentService = {
     const existing = this.getById(id);
     if (!existing) return null;
     const updated = { ...existing, ...data };
+
+    // 平台助手改为统一 Markdown 输出，但仍然禁止回落到“预览+完整代码”。
+    // 历史上这个字段多次被其它编辑链路/脏数据回写，直接导致助手回复重新出现：
+    // - 预览
+    // - 完整答复
+    // 所以写入层继续做硬保护：平台助手固定为 Markdown，而不是任由 DB 脏写。
+    if (this.isPlatformAssistantId(existing.id) || this.isPlatformAssistantId(existing.openclawAgentId)) {
+      updated.outputFormat = 'Markdown';
+    }
+
+    const resolvedAgentType = updated.agentType || 'general';
+    const resolvedOpenClawAgentId = updated.isSystem
+      ? updated.openclawAgentId
+      : toOpenClawAgentId(resolvedAgentType);
     db.run(
       `UPDATE agents SET name=?, color=?, system_prompt=?, writing_style=?, expertise=?, description=?, status=?,
         model_name=?, model_provider=?, temperature=?, max_tokens=?, top_p=?, frequency_penalty=?, presence_penalty=?,
         token_provider=?, token_api_key=?, token_base_url=?,
         output_format=?, boundary=?, memory_turns=?, temperature_override=?,
-        visibility=?, skills_config=?, quota_config=?
+        visibility=?, skills_config=?, quota_config=?, openclaw_agent_id=?, agent_type=?
        WHERE id=?`,
       [
         updated.name, updated.color, updated.systemPrompt, updated.writingStyle,
@@ -350,6 +384,8 @@ export const AgentService = {
         updated.visibility || "private",
         JSON.stringify(updated.skillsConfig || {}),
         JSON.stringify(updated.quotaConfig || {}),
+        resolvedOpenClawAgentId,
+        resolvedAgentType,
         id,
       ]
     );

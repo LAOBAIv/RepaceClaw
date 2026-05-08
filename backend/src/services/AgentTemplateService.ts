@@ -1,6 +1,33 @@
 import { v4 as uuidv4 } from "uuid";
 import { getDb, saveDb } from "../db/client";
 
+function categoryToAgentType(category?: string): string {
+  switch (category) {
+    case 'engineering':
+    case 'integrations':
+    case 'testing':
+      return 'dev';
+    case 'design':
+      return 'creative';
+    case 'project-management':
+    case 'product':
+      return 'pm';
+    case 'academic':
+      return 'research';
+    case 'marketing':
+    case 'paid-media':
+    case 'strategy':
+    case 'sales':
+      return 'ops';
+    case 'support':
+      return 'general';
+    case 'specialized':
+      return 'general';
+    default:
+      return 'general';
+  }
+}
+
 export interface AgentTemplate {
   id: string;
   name: string;
@@ -78,6 +105,7 @@ export const AgentTemplateService = {
     if (!template) throw new Error("Template not found");
 
     const { AgentService } = require("./AgentService");
+    const agentType = overrides.agentType || categoryToAgentType(template.category);
     const agent = AgentService.create({
       name: overrides.name || template.name,
       color: template.color,
@@ -87,6 +115,7 @@ export const AgentTemplateService = {
       description: template.description,
       outputFormat: template.outputFormat,
       userId: overrides.userId,  // Phase 3: 绑定当前用户
+      agentType,
       ...overrides,
     });
     return agent;

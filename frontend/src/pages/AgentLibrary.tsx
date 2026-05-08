@@ -231,6 +231,40 @@ const OUTPUT_FORMAT_CN: Record<string, string> = {
   "bullet-points": "要点列表",
 };
 
+const AGENT_TYPE_LABELS: Record<string, string> = {
+  dev: '工程开发类',
+  data: '数据分析类',
+  creative: '内容生成类',
+  pm: '项目管理类',
+  research: '知识推理类',
+  ops: '平台策略类',
+  decision: '决策支持类',
+  general: '通用助手类',
+};
+
+function templateCategoryToAgentType(category?: string): keyof typeof AGENT_TYPE_LABELS {
+  switch (category) {
+    case 'engineering':
+    case 'integrations':
+    case 'testing':
+      return 'dev';
+    case 'design':
+      return 'creative';
+    case 'project-management':
+    case 'product':
+      return 'pm';
+    case 'academic':
+      return 'research';
+    case 'marketing':
+    case 'paid-media':
+    case 'strategy':
+    case 'sales':
+      return 'ops';
+    default:
+      return 'general';
+  }
+}
+
 // vibe 中文翻译
 const VIBE_CN: Record<string, string> = {
   // Engineering
@@ -428,6 +462,7 @@ const navigate = useNavigate();
         expertise: template.expertise,
         systemPrompt: template.systemPrompt,
         vibe: template.vibe,
+        category: template.category,
       }
     });
   }
@@ -483,63 +518,140 @@ const navigate = useNavigate();
     <>
       <style>{`
         .al-wrap {
+          width: 100%;
+          height: 100%;
+          min-height: 0;
+          display: flex;
+          flex-direction: column;
           font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
+          background: #f5f7fa;
+          padding: 16px;
+          box-sizing: border-box;
+          overflow: hidden;
+        }
+        .al-card {
+          flex: 1;
+          min-height: 0;
+          display: flex;
+          flex-direction: column;
+          background: #fafbfc;
+          border: 1px solid #e5e6eb;
+          border-radius: 12px;
+          box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+          overflow: hidden;
+        }
+        .al-header {
+          padding: 16px 32px;
+          min-height: 58px;
+          border-bottom: 1px solid #e5e6eb;
+          background: #ffffff;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          flex-shrink: 0;
+          box-sizing: border-box;
+        }
+        .al-scroll {
+          flex: 1;
+          min-height: 0;
+          overflow-y: auto;
+          overflow-x: hidden;
+          padding: 14px 20px 0;
+          box-sizing: border-box;
+        }
+        .al-panel {
+          background: transparent;
+          border: none;
+          border-radius: 0;
+          box-shadow: none;
+        }
+        .create-btn {
+          border: none;
+          border-radius: 8px;
+          background: #2a3b4d;
+          color: #fff;
+          cursor: pointer;
+          transition: background 0.15s ease;
+          font-family: inherit;
+        }
+        .create-btn:hover {
+          background: #1e2d3d;
+        }
+        .al-footer {
+          padding: 10px 24px;
+          border-top: 1px solid #ebebeb;
+          background: #fff;
+          display: flex;
+          justify-content: center;
+          gap: 10px;
+          flex-shrink: 0;
+          min-height: 52px;
         }
       `}</style>
-      <div className="al-wrap" style={{ height: "100%", overflowY: "auto", padding: "24px 32px", background: "var(--body-bg)" }}>
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold" style={{ color: "#333333" }}>🎭 Agent 模板库</h1>
-        </div>
-
-        {/* Success message */}
-        {successMsg && (
-          <div className="mb-4 p-3 rounded-xl text-sm" style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", color: "#16a34a" }}>
-            {successMsg}
+      <div className="al-wrap">
+        <div className="al-card">
+          <div className="al-header">
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <span style={{ fontWeight: 700, fontSize: 16, color: '#1a202c', margin: 0 }}>
+                🎭 Agent 模板库
+              </span>
+              <span style={{ fontSize: 12, color: 'rgb(156, 163, 175)', marginLeft: 10 }}>
+                共 {templates.length}个智能体模版
+              </span>
+            </div>
           </div>
-        )}
+          <div className="al-scroll">
+            <div style={{ width: '100%', maxWidth: 'none', margin: 0 }}>
+              {/* Success message */}
+              {successMsg && (
+                <div className="mb-4 p-3 rounded-xl text-sm al-panel" style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", color: "#16a34a" }}>
+                  {successMsg}
+                </div>
+              )}
 
-        {/* Search */}
-        <div className="mb-4">
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
-            <input
-              type="text"
-              placeholder="搜索智能体（名称、描述、简介、角色设定）..."
-              value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setCurrentPage(1); // 重置到第一页
-              }}
-              className="w-full px-4 py-2 pl-10 rounded-xl text-sm"
-              style={{ border: "1px solid #e5e7eb", background: "#fff", color: "#333333" }}
-            />
-          </div>
-        </div>
+              {/* Search */}
+              <div className="mb-3 al-panel" style={{ padding: 0 }}>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
+                  <input
+                    type="text"
+                    placeholder="搜索智能体（名称、描述、简介、角色设定）..."
+                    value={searchTerm}
+                    onChange={(e) => {
+                      setSearchTerm(e.target.value);
+                      setCurrentPage(1); // 重置到第一页
+                    }}
+                    className="w-full px-4 py-2 pl-10 rounded-xl text-sm"
+                    style={{ border: "1px solid #d1d5db", background: "#fff", color: "#333333" }}
+                  />
+                </div>
+              </div>
 
-        {/* Category filter */}
-        <div className="flex flex-wrap gap-2 mb-6">
-          <button
-            onClick={() => setSelectedCategory("all")}
-            className="px-3 py-1.5 text-sm rounded-full min-w-[120px]" style={{ background: selectedCategory === "all" ? "var(--accent)" : "var(--muted)", color: selectedCategory === "all" ? "#fff" : "var(--text-secondary)", fontWeight: selectedCategory === "all" ? 600 : 400, }} > 全部模板 ({templates.length})
-          </button>
-          {categories.map((cat) => {
-            const count = templates.filter((t) => t.category === cat).length;
-            return (
-              <button
-                key={cat}
-                onClick={() => setSelectedCategory(cat)}
-                className="px-3 py-1.5 text-sm rounded-full min-w-[120px]" style={{ background: selectedCategory === cat ? "var(--accent)" : "var(--muted)", color: selectedCategory === cat ? "#fff" : "var(--text-secondary)", fontWeight: selectedCategory === cat ? 600 : 400, }}
-              >
-                {CATEGORY_LABELS[cat] || cat} ({count})
-              </button>
-            );
-          })}
-        </div>
+              {/* Category filter */}
+              <div className="mb-3 al-panel" style={{ padding: '10px 12px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10 }}>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setSelectedCategory("all")}
+                    className="px-3 py-1.5 text-sm rounded-full min-w-[120px]" style={{ background: selectedCategory === "all" ? "#2a3b4d" : "#f3f4f6", color: selectedCategory === "all" ? "#fff" : "#4b5563", fontWeight: selectedCategory === "all" ? 600 : 400, border: '1px solid ' + (selectedCategory === "all" ? '#2a3b4d' : '#e5e7eb') }} > 全部模板 ({templates.length})
+                  </button>
+                  {categories.map((cat) => {
+                    const count = templates.filter((t) => t.category === cat).length;
+                    return (
+                      <button
+                        key={cat}
+                        onClick={() => setSelectedCategory(cat)}
+                        className="px-3 py-1.5 text-sm rounded-full min-w-[120px]" style={{ background: selectedCategory === cat ? "#2a3b4d" : "#f3f4f6", color: selectedCategory === cat ? "#fff" : "#4b5563", fontWeight: selectedCategory === cat ? 600 : 400, border: '1px solid ' + (selectedCategory === cat ? '#2a3b4d' : '#e5e7eb') }}
+                      >
+                        {CATEGORY_LABELS[cat] || cat} ({count})
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
 
-        {/* Templates display */}
-        {selectedCategory === "all" ? (
+              {/* Templates display */}
+              <div className="al-panel" style={{ padding: 0 }}>
+                {selectedCategory === "all" ? (
           // 全部模板：扁平列表 + 分页
           <>
             {paginatedTemplates.length === 0 ? (
@@ -552,30 +664,25 @@ const navigate = useNavigate();
                   {paginatedTemplates.map((t) => {
                     const displayName = cnName(t.name);
                     const displayDesc = cnDesc(t.name, t.description);
+                    const execType = templateCategoryToAgentType(t.category);
                     return (
                       <div
                         key={t.id}
                         className="border rounded-xl p-4 hover:shadow-md transition-shadow bg-card"
-                        style={{ border: "1px solid #e5e7eb", background: "#fff", height: "200px", overflow: "hidden", display: "flex", flexDirection: "column" }}
+                        style={{ border: "1px solid #e5e7eb", background: "#fff", height: "165px", overflow: "hidden", display: "flex", flexDirection: "column" }}
                       >
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-center gap-2">
-                            <span className="text-2xl">{t.emoji}</span>
-                            <div>
-                              <h3 className="font-semibold" style={{ color: "#333333", fontSize: 14, fontFamily: "inherit" }}>
-                                {displayName}
-                              </h3>
-                              <p className="text-xs" style={{ color: "var(--text-muted)", fontFamily: "inherit" }}>
-                                {VIBE_CN[t.name] || t.vibe}
-                              </p>
-                            </div>
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-2xl" style={{ lineHeight: 1, display: 'flex', alignItems: 'center' }}>{t.emoji}</span>
+                            <h3 className="font-semibold truncate" style={{ color: "#333333", fontSize: 14, fontFamily: "inherit", margin: 0 }}>
+                              {displayName}
+                            </h3>
                           </div>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               handleCreate(t);
                             }}
-                            
                             className="create-btn px-4 py-1.5 text-sm font-semibold min-w-[60px]"
                           >
                             创建
@@ -584,35 +691,23 @@ const navigate = useNavigate();
                         <p className="text-xs mt-2 line-clamp-2" style={{ color: "var(--text-muted)", fontFamily: "inherit" }}>
                           {displayDesc}
                         </p>
-                        <div className="flex flex-wrap gap-1 mt-2">
-                          {t.expertise.slice(0, 3).map((e) => (
-                            <span
-                              key={e}
-                              className="px-2 py-0.5 text-xs rounded-full"
-                              style={{ background: "#f3f4f6", color: "#6b7280", border: "1px solid #e5e7eb", fontSize: 11, fontFamily: "inherit" }}
-                            >
-                              {EXPERTISE_CN[e] || e}
-                            </span>
-                          ))}
-                        </div>
-
-                        {/* 详情展示 */}
-                        <div className="mt-3 pt-3 border-t text-xs space-y-2" style={{ borderTop: "1px solid #e5e7eb", fontFamily: "inherit" }}>
-                          <p style={{ color: "var(--text-muted)", lineHeight: 1.5, fontFamily: "inherit" }}>
-                            <span style={{ fontWeight: 500, color: "var(--text-secondary)", fontFamily: "inherit" }}>系统提示：</span>
+                        <div className="mt-2 pt-2 border-t text-xs space-y-1.5" style={{ borderTop: "1px solid #e5e7eb", fontFamily: "inherit" }}>
+                          <p className="line-clamp-2" style={{ color: "#9ca3af", lineHeight: 1.5, margin: 0, fontFamily: "inherit" }}>
+                            <span style={{ fontWeight: 500, color: "#94a3b8", fontFamily: "inherit" }}>系统提示：</span>
                             {t.description}
                           </p>
-                          <div className="flex flex-wrap gap-3" style={{ color: "var(--text-muted)", fontFamily: "inherit" }}>
+                          <div className="flex flex-wrap gap-3" style={{ color: "#9ca3af", fontFamily: "inherit" }}>
                             <span>风格: {WRITING_STYLE_CN[t.writingStyle] || t.writingStyle}</span>
                             <span>输出: {OUTPUT_FORMAT_CN[t.outputFormat] || t.outputFormat}</span>
+                            <span>执行分类: {AGENT_TYPE_LABELS[execType]}</span>
                           </div>
                         </div>
                       </div>
                     );
                   })}
                 </div>
-                {/* 分页组件 - 固定在底部 */}
-                <div className="flex justify-center items-center gap-2 mt-6" style={{ position: "sticky", bottom: 0, background: "var(--body-bg)", padding: "12px 0", zIndex: 10 }}>
+                {/* 分页组件移入统一 footer，这里只保留内容区 */}
+                <div className="flex justify-center items-center gap-2 mt-4" style={{ padding: "8px 0 0", display: 'none' }}>
                   <button
                     onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                     disabled={currentPage === 1}
@@ -710,23 +805,19 @@ const navigate = useNavigate();
                   {items.map((t) => {
                     const displayName = cnName(t.name);
                     const displayDesc = cnDesc(t.name, t.description);
+                    const execType = templateCategoryToAgentType(t.category);
                     return (
                       <div
                         key={t.id}
                         className="border rounded-xl p-4 hover:shadow-md transition-shadow bg-card"
-                        style={{ border: "1px solid #e5e7eb", background: "#fff", height: "200px", overflow: "hidden", display: "flex", flexDirection: "column" }}
+                        style={{ border: "1px solid #e5e7eb", background: "#fff", height: "165px", overflow: "hidden", display: "flex", flexDirection: "column" }}
                       >
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-center gap-2">
-                            <span className="text-2xl">{t.emoji}</span>
-                            <div>
-                              <h3 className="font-semibold" style={{ color: "#333333", fontSize: 14, fontFamily: "inherit" }}>
-                                {displayName}
-                              </h3>
-                              <p className="text-xs" style={{ color: "var(--text-muted)", fontFamily: "inherit" }}>
-                                {VIBE_CN[t.name] || t.vibe}
-                              </p>
-                            </div>
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-2xl" style={{ lineHeight: 1, display: 'flex', alignItems: 'center' }}>{t.emoji}</span>
+                            <h3 className="font-semibold truncate" style={{ color: "#333333", fontSize: 14, fontFamily: "inherit", margin: 0 }}>
+                              {displayName}
+                            </h3>
                           </div>
                           <button
                             onClick={(e) => {
@@ -741,16 +832,16 @@ const navigate = useNavigate();
                         <p className="text-xs mt-2 line-clamp-2" style={{ color: "var(--text-muted)", fontFamily: "inherit" }}>
                           {displayDesc}
                         </p>
-                        <div className="flex flex-wrap gap-1 mt-2">
-                          {t.expertise.slice(0, 3).map((e) => (
-                            <span
-                              key={e}
-                              className="px-2 py-0.5 text-xs rounded-full"
-                              style={{ background: "#f3f4f6", color: "#6b7280", border: "1px solid #e5e7eb", fontSize: 11, fontFamily: "inherit" }}
-                            >
-                              {EXPERTISE_CN[e] || e}
-                            </span>
-                          ))}
+                        <div className="mt-2 pt-2 border-t text-xs space-y-1.5" style={{ borderTop: "1px solid #e5e7eb", fontFamily: "inherit" }}>
+                          <p className="line-clamp-2" style={{ color: "#9ca3af", lineHeight: 1.5, margin: 0, fontFamily: "inherit" }}>
+                            <span style={{ fontWeight: 500, color: "#94a3b8", fontFamily: "inherit" }}>系统提示：</span>
+                            {t.description}
+                          </p>
+                          <div className="flex flex-wrap gap-3" style={{ color: "#9ca3af", fontFamily: "inherit" }}>
+                            <span>风格: {WRITING_STYLE_CN[t.writingStyle] || t.writingStyle}</span>
+                            <span>输出: {OUTPUT_FORMAT_CN[t.outputFormat] || t.outputFormat}</span>
+                            <span>执行分类: {AGENT_TYPE_LABELS[execType]}</span>
+                          </div>
                         </div>
                       </div>
                     );
@@ -760,8 +851,85 @@ const navigate = useNavigate();
             ))}
           </div>
         )}
+              </div>
+            </div>
+          </div>
+          {selectedCategory === "all" && totalPages > 0 && (
+            <div className="al-footer">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1.5 text-sm rounded-lg font-medium"
+                style={{
+                  background: currentPage === 1 ? "#e5e7eb" : "#2a3b4d",
+                  color: currentPage === 1 ? "#9ca3af" : "#fff",
+                  cursor: currentPage === 1 ? "not-allowed" : "pointer"
+                }}
+              >
+                上一页
+              </button>
+              <div className="flex items-center gap-1" style={{ minWidth: "200px", justifyContent: "center" }}>
+                {(() => {
+                  const pages: (number | string)[] = [];
+                  const total = totalPages || 1;
+                  const maxShow = 6;
+                  if (total <= maxShow) {
+                    for (let i = 1; i <= total; i++) pages.push(i);
+                  } else {
+                    pages.push(1);
+                    if (currentPage <= 3) {
+                      for (let i = 2; i <= 5; i++) pages.push(i);
+                      pages.push("...");
+                      pages.push(total);
+                    } else if (currentPage >= total - 2) {
+                      pages.push("...");
+                      for (let i = total - 4; i <= total; i++) pages.push(i);
+                    } else {
+                      pages.push("...");
+                      for (let i = currentPage - 1; i <= currentPage + 1; i++) pages.push(i);
+                      pages.push("...");
+                      pages.push(total);
+                    }
+                  }
+                  return pages.map((p, idx) => {
+                    if (p === "...") {
+                      return <span key={`footer-ellipsis-${idx}`} style={{ color: "#9ca3af", padding: "0 4px" }}>...</span>;
+                    }
+                    return (
+                      <button
+                        key={`footer-page-${p}`}
+                        onClick={() => setCurrentPage(p as number)}
+                        className="px-3 py-1.5 text-sm rounded-lg font-medium min-w-[32px]"
+                        style={{
+                          background: currentPage === p ? "#2a3b4d" : "#fff",
+                          color: currentPage === p ? "#fff" : "#374151",
+                          border: "1px solid #d1d5db",
+                          cursor: "pointer"
+                        }}
+                      >
+                        {p}
+                      </button>
+                    );
+                  });
+                })()}
+              </div>
+              
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages || 1, p + 1))}
+                disabled={currentPage === totalPages || totalPages === 0}
+                className="px-3 py-1.5 text-sm rounded-lg font-medium"
+                style={{
+                  background: currentPage === totalPages || totalPages === 0 ? "#e5e7eb" : "#2a3b4d",
+                  color: currentPage === totalPages || totalPages === 0 ? "#9ca3af" : "#fff",
+                  cursor: currentPage === totalPages || totalPages === 0 ? "not-allowed" : "pointer"
+                }}
+              >
+                下一页
+              </button>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
     </>
   );
 }

@@ -35,6 +35,10 @@ export interface Agent {
     maxDailyConversations?: number;
     maxTokensPerMessage?: number;
   };
+  /** RC 执行分类：用于映射到 OC 固定执行智能体 */
+  agentType?: 'dev' | 'data' | 'creative' | 'pm' | 'research' | 'ops' | 'decision' | 'general';
+  /** 对应的 OpenClaw 执行智能体 ID */
+  openclawAgentId?: string | null;
   createdAt: string;
   isSystem?: boolean;
 }

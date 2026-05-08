@@ -60,10 +60,12 @@ export function PluginSettings() {
         /* header */
         .ps-header {
           padding: 16px 32px;
+          min-height: 58px;
           border-bottom: 1px solid #e5e6eb;
           background: #ffffff;
           display: flex; align-items: center; justify-content: space-between;
           flex-shrink: 0;
+          box-sizing: border-box;
         }
         .ps-header-left { display: flex; align-items: center; gap: 10px; }
         .ps-add-btn {

@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
 import { tasksApi } from '../api/tasks';
 
 /* ─── 业务规则（重要）───────────────────────────────────────────
@@ -205,7 +204,6 @@ interface TaskState {
 
 /* ─── Store 实现 ─────────────────────────────────────────────── */
 export const useTaskStore = create<TaskState>()(
-  persist(
     (set, get) => ({
       tasks: EMPTY_TASKS,
 
@@ -251,6 +249,11 @@ export const useTaskStore = create<TaskState>()(
         set(state => ({
           tasks: { ...state.tasks, [col]: [{ ...task, agents: safeAgents }, ...state.tasks[col]] },
         }));
+        // 方案 C: 广播任务变更事件
+        import("../lib/sync").then(({ getBroadcastSync }) => {
+          const bc = getBroadcastSync();
+          if (bc) bc.send('task.updated', { taskId: task.id, action: 'add' });
+        }).catch(() => {});
       },
 
       addTaskFromChat: ({ title, agentName, agentColor, panelId, sessionId, agentId, userId, taskId: externalTaskId }) => {
@@ -317,6 +320,11 @@ export const useTaskStore = create<TaskState>()(
           }
           return { tasks: { ...state.tasks, progress: [newTask, ...state.tasks.progress] } };
         });
+        // 方案 C: 广播任务变更事件
+        import("../lib/sync").then(({ getBroadcastSync }) => {
+          const bc = getBroadcastSync();
+          if (bc) bc.send('task.updated', { taskId: newTask.id, action: 'add' });
+        }).catch(() => {});
         return newTask;
       },
 
@@ -332,6 +340,11 @@ export const useTaskStore = create<TaskState>()(
             },
           };
         });
+        // 方案 C: 广播任务变更事件
+        import("../lib/sync").then(({ getBroadcastSync }) => {
+          const bc = getBroadcastSync();
+          if (bc) bc.send('task.updated', { taskId, action: 'move' });
+        }).catch(() => {});
       },
 
       updateTask: (taskId, patch) => {
@@ -348,6 +361,11 @@ export const useTaskStore = create<TaskState>()(
           }
           return { tasks: newTasks };
         });
+        // 方案 C: 广播任务变更事件
+        import("../lib/sync").then(({ getBroadcastSync }) => {
+          const bc = getBroadcastSync();
+          if (bc) bc.send('task.updated', { taskId, action: 'update', patch });
+        }).catch(() => {});
       },
 
       /** 删除任务 */
@@ -370,6 +388,11 @@ export const useTaskStore = create<TaskState>()(
           }
           return { tasks: newTasks };
         });
+        // 方案 C: 广播任务变更事件
+        import("../lib/sync").then(({ getBroadcastSync }) => {
+          const bc = getBroadcastSync();
+          if (bc) bc.send('task.updated', { taskId, action: 'remove' });
+        }).catch(() => {});
       },
 
       findTaskCol: (taskId) => {
@@ -381,19 +404,4 @@ export const useTaskStore = create<TaskState>()(
         return null;
       },
     }),
-    {
-      // ⚠️ 防跨用户数据串扰：localStorage key 按用户隔离
-      // 旧全局 key `wb-task-store` 导致不同用户看到彼此的项目/任务数据
-      name: (() => {
-        try {
-          const auth = JSON.parse(localStorage.getItem('repaceclaw-auth') || '{}');
-          const uid = auth?.state?.user?.id;
-          return uid ? `wb-task-store-${uid}` : 'wb-task-store';
-        } catch {
-          return 'wb-task-store';
-        }
-      })(),
-      storage: createJSONStorage(() => localStorage),
-    }
-  )
 );

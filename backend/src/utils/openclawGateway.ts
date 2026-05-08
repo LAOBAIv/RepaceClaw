@@ -23,6 +23,13 @@ type GatewayResolved = {
   token: string;
 };
 
+function isPlaceholderValue(value?: string | null): boolean {
+  if (!value) return true;
+  const v = value.trim();
+  if (!v) return true;
+  return v.startsWith('<REPLACE') || v.startsWith('REPLACE_') || v.includes('YOUR_') || v.includes('CHANGEME');
+}
+
 function readOpenClawConfig(): any {
   try {
     if (!fs.existsSync(OPENCLAW_CONFIG_PATH)) return null;
@@ -33,9 +40,13 @@ function readOpenClawConfig(): any {
 }
 
 export function resolveOpenClawGateway(): GatewayResolved {
-  // 优先环境变量；没有就读取 OpenClaw 主配置，保证 backend 独立重启后仍能拿到正确 token。
-  const envUrl = process.env.OPENCLAW_GATEWAY_URL?.trim();
-  const envToken = process.env.OPENCLAW_GATEWAY_TOKEN?.trim();
+  // 优先环境变量；但仓库内为了安全可能故意保留占位符值。
+  // 若检测到 placeholder（如 <REPLACE...>），必须回退到 openclaw.json 真配置，
+  // 否则 backend 会拿假 token 去打 Gateway，表现为 RC 智能体一直 401 不回复。
+  const envUrlRaw = process.env.OPENCLAW_GATEWAY_URL?.trim();
+  const envTokenRaw = process.env.OPENCLAW_GATEWAY_TOKEN?.trim();
+  const envUrl = isPlaceholderValue(envUrlRaw) ? '' : (envUrlRaw || '');
+  const envToken = isPlaceholderValue(envTokenRaw) ? '' : (envTokenRaw || '');
 
   const cfg = readOpenClawConfig();
   const port = cfg?.gateway?.port || 18789;

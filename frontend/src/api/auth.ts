@@ -7,8 +7,14 @@ export interface RegisterInput {
 }
 
 export interface LoginInput {
-  email: string;
+  /** 账号标识：支持邮箱或用户名 */
+  identifier: string;
   password: string;
+}
+
+export interface UpdateMeInput {
+  username?: string;
+  avatar?: string;
 }
 
 export const authApi = {
@@ -20,6 +26,9 @@ export const authApi = {
 
   me: () =>
     apiClient.get("/auth/me").then((r) => r.data),
+
+  updateMe: (data: UpdateMeInput) =>
+    apiClient.put("/auth/me", data).then((r) => r.data),
 
   changePassword: (oldPassword: string, newPassword: string) =>
     apiClient.put("/auth/password", { oldPassword, newPassword }).then((r) => r.data),

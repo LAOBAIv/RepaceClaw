@@ -19,7 +19,7 @@ const SKILL_OPTIONS = [
   "情感支持", "知识检索", "图表解读", "任务规划",
 ];
 
-const OUTPUT_FORMATS = ["纯文本", "Markdown", "JSON", "列表", "表格", "预览+完整代码"];
+const OUTPUT_FORMATS = ["纯文本", "Markdown", "JSON", "列表", "表格", "Markdown+完整代码"];
 const MEMORY_OPTIONS = ["短期（8K）", "中期（32K）", "长期（128K）"];
 const TEMP_OPTIONS = ["0.1", "0.3", "0.5", "0.7", "0.9", "1.0"];
 
@@ -351,7 +351,7 @@ export function AgentCreateForm({ onCancel, onCreate }: Props) {
   const [skillModalOpen, setSkillModalOpen] = useState(false);
   const [modelModalOpen, setModelModalOpen] = useState(false);
   const [boundary, setBoundary] = useState("");
-  const [outputFormat, setOutputFormat] = useState("预览+完整代码");
+  const [outputFormat, setOutputFormat] = useState("Markdown");
   const [memory, setMemory] = useState("中期（32K）");
   const [temperature, setTemperature] = useState("0.7");
 

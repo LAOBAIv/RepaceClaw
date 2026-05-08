@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { persist, createJSONStorage } from "zustand/middleware";
 
 export type UserRole = "super_admin" | "admin" | "user";
 
@@ -44,6 +44,9 @@ export const useAuthStore = create<AuthStore>()(
     }),
     {
       name: "repaceclaw-auth",
+      // Plan C: 使用 sessionStorage 实现 tab 级隔离
+      // 同一浏览器不同 tab 可以登录不同账号，关闭 tab 后自动失效
+      storage: createJSONStorage(() => sessionStorage),
     }
   )
 );
