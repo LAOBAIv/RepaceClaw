@@ -45,8 +45,8 @@ export async function handleIncomingMessage(config: ILinkConfig, msg: unknown): 
   try {
     const configResp = await getConfig(config, fromUserId as string, typeof contextToken === 'string' ? contextToken : undefined) as Record<string, unknown> | undefined;
     typingTicket = (configResp?.typing_ticket as string) || '';
-  } catch {}
-  if (typingTicket) sendTyping(config, fromUserId, typingTicket).catch(() => {});
+  } catch (err) { logger.warn(`[iLink] getConfig for typing failed: ${err}`); }
+  if (typingTicket) sendTyping(config, fromUserId, typingTicket).catch((err) => logger.warn(`[iLink] sendTyping failed: ${err}`));
 
   // 调用 wechatIncoming 处理逻辑
   try {

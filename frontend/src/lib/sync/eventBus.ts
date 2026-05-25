@@ -62,10 +62,8 @@ export type SyncEventHandler<T = unknown> = (event: SyncEvent<T>) => void;
 
 // ─── 事件总线实现 ───
 
-/** 事件去重窗口（毫秒） */
-const DEDUP_WINDOW_MS = 5000;
 /** 最多保留的已处理事件 ID 数量 */
-const MAX_RECENT_EVENTS = 200;
+// const MAX_RECENT_EVENTS = 200; // reserved for future use
 
 class SyncEventBus {
   /** 订阅者：事件类型 → 处理函数集合 */

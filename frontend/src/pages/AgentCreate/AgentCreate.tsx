@@ -10,7 +10,6 @@
  */
 import { useState, useEffect } from 'react';
 import { PlusCircle } from 'lucide-react';
-import { useAuthStore } from '@/stores/authStore';
 import apiClient from '@/api/client';
 import type { BackendSkill, CodeChannel, CodeModel } from './types';
 import { CODE_CHANNELS } from './constants';
@@ -34,8 +33,7 @@ import { TokenModal } from './TokenModal';
 import { CodeModal } from './CodeModal';
 
 export function AgentCreate() {
-  const user = useAuthStore((s) => s.user);
-  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+  // const user = useAuthStore((s) => s.user); // reserved for future use
 
   /* ═══════════════════════════════════════════════════════════
    * 动态渠道加载
@@ -97,8 +95,7 @@ export function AgentCreate() {
     Promise.all([
       apiClient.get('/skills').catch(() => ({ data: { data: [] } })),
       apiClient.get(`/skills/agent/${form.editId}`).catch(() => ({ data: { data: [] } })),
-    ]).then(([allRes, boundRes]) => {
-      const allSkills: BackendSkill[] = allRes.data.data ?? [];
+    ]).then(([, boundRes]) => {
       const boundSkills: BackendSkill[] = boundRes.data.data ?? [];
       skills.loadBackendSkills().then(() => {
         // loadBackendSkills 内部会设置 backendSkills
@@ -153,7 +150,7 @@ export function AgentCreate() {
         tempCustomUrl={token.tempCustomUrl}
         onTempCustomUrlChange={token.setCustomBaseUrl}
         tempTokenModel={token.tempTokenModel}
-        onTempTokenModelChange={(m) => {/* handled in confirmTokenModal */}}
+        onTempTokenModelChange={() => {/* handled in confirmTokenModal */}}
         showToken={token.showToken}
         onShowTokenToggle={() => token.setTokenValue(token.tempTokenValue)}
       />

@@ -26,7 +26,6 @@ export function CollabFlow({
   onSwitchPanel,
   onOpenPanel,
   onClosePanel,
-  onUpgradeToProject,
 }: CollabFlowProps) {
   const [pickerNodeId, setPickerNodeId] = useState<string | null>(null);
   const [showAddMenu, setShowAddMenu] = useState(false);

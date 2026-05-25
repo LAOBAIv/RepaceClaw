@@ -62,7 +62,7 @@ export function AgentChannelOverview() {
   // 统计
   const systemChannels = channels.filter(c => c.isSystem);
   const userChannels = channels.filter(c => !c.isSystem);
-  const totalRcAgents = channels.reduce((sum, c) => sum + c.rcAgents.filter(a => !c.isSystem).length, 0);
+  const totalRcAgents = channels.reduce((sum, c) => sum + c.rcAgents.filter(() => !c.isSystem).length, 0);
   // 置顶：系统通道在前
   const sortedChannels = [...systemChannels, ...userChannels];
 

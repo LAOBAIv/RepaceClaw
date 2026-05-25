@@ -1,5 +1,4 @@
 // API service for group chat projects
-import { Project } from '@/types';
 
 export interface GroupChatProject {
   id: string;

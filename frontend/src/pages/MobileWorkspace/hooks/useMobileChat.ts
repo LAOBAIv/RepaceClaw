@@ -17,11 +17,11 @@ import { useConversationStore } from '../../../stores/conversation';
 import { useAgentStore } from '../../../stores/agentStore';
 import { useAuthStore } from '../../../stores/authStore';
 import apiClient from '../../../api/client';
-import { AVAILABLE_MODELS, COLORS } from '../constants';
+import { AVAILABLE_MODELS } from '../constants';
 
 export function useMobileChat() {
   const navigate = useNavigate();
-  const { user, logout } = useAuthStore();
+  const { logout } = useAuthStore();
 
   // ── 接入 conversation store ──
   const {

@@ -6,7 +6,7 @@
  * 微信助手 Tab 逻辑已提取到 hooks/useWechatTab.ts
  * 在线状态检测已提取到 hooks/useOnlineStatus.ts
  */
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import '../ProjectWorkspace.css';
 
@@ -14,7 +14,6 @@ import { useConversationStore } from '@/stores/conversation';
 import { useAgentStore } from '@/stores/agentStore';
 import { useProjectStore } from '@/stores/projectStore';
 import { useTaskStore } from '@/stores/taskStore';
-import { useProjectKanbanStore } from '@/stores/projectKanbanStore';
 import { SessionAgentBar } from '@/components/SessionAgentBar';
 import { NewTabModal } from '@/components/NewTabModal';
 import { PriorityModal } from './PriorityModal';
@@ -25,22 +24,21 @@ import { TabBar } from './TabBar';
 import { ChatArea } from './ChatArea';
 import { ChatInput } from './ChatInput';
 import { WorkspaceSidebar } from './WorkspaceSidebar';
-import { ProjectActions } from './ProjectActions';
 
 // Hooks
 import { useTabs } from './hooks/useTabs';
 import { useChat } from './hooks/useChat';
 import { useProjectState } from './hooks/useProjectState';
-import { useOnlineStatus } from './hooks/useOnlineStatus';
+// import { useOnlineStatus } from './hooks/useOnlineStatus'; // reserved for future use
 import { useWechatTab } from './hooks/useWechatTab';
 import { useWorkspaceInit } from './hooks/useWorkspaceInit';
 
 /** 应用状态配置常量 */
-const STATUS_CONFIG = {
-  running: { label: '运行中', bg: '#e8f5e9', color: '#2e7d32', border: '#dcedc8', dotColor: '#22c55e' },
-  offline: { label: '离线',   bg: '#fef2f2', color: '#b91c1c', border: '#fecaca', dotColor: '#ef4444' },
-  busy:    { label: '忙碌',   bg: '#fffbeb', color: '#b45309', border: '#fde68a', dotColor: '#f59e0b' },
-} as const;
+// const STATUS_CONFIG = {
+//   running: { label: '运行中', bg: '#e8f5e9', color: '#2e7d32', border: '#dcedc8', dotColor: '#22c55e' },
+//   offline: { label: '离线',   bg: '#fef2f2', color: '#b91c1c', border: '#fecaca', dotColor: '#ef4444' },
+//   busy:    { label: '忙碌',   bg: '#fffbeb', color: '#b45309', border: '#fde68a', dotColor: '#f59e0b' },
+// } as const;
 
 export function ProjectWorkspace() {
   const location = useLocation();
@@ -52,8 +50,7 @@ export function ProjectWorkspace() {
   const incomingAgentNames = navState?.agentNames;
 
   /* ── Store ── */
-  const { openPanels, openPanel, sendMessage, connect, closePanel, wsConnected, restoreFromPersist,
-    sessionTabs: storeSessionTabs, activeTabId: storeActiveTabId } = useConversationStore();
+  const { openPanels, openPanel, connect, closePanel } = useConversationStore();
   const { agents, fetchAgents } = useAgentStore();
   const { currentProject } = useProjectStore();
 
@@ -61,9 +58,9 @@ export function ProjectWorkspace() {
   const tabs = useTabs();
   const chat = useChat();
   const project = useProjectState(incomingProjectId, incomingProjectName, incomingTaskId, incomingAgentNames);
-  const isOnline = useOnlineStatus();
+  // const isOnline = useOnlineStatus(); // reserved for future use
   const { handleWechatTabClick } = useWechatTab(tabs.switchTab, chat.setActivePanelId);
-  const { restoreReady } = useWorkspaceInit(
+  useWorkspaceInit(
     navState,
     project.fetchProjects,
     fetchAgents,
@@ -79,10 +76,9 @@ export function ProjectWorkspace() {
   const [showChannelModal, setShowChannelModal] = useState(false);
 
   /* ── 顶部状态徽标 ── */
-  const isAnyStreaming = openPanels.some(p => p.isStreaming);
-  type AppStatus = 'running' | 'offline' | 'busy';
-  const appStatus: AppStatus = !isOnline || !wsConnected ? 'offline' : isAnyStreaming ? 'busy' : 'running';
-  const statusCfg = STATUS_CONFIG[appStatus];
+  // const isAnyStreaming = openPanels.some(p => p.isStreaming); // reserved for future use
+  // type AppStatus = 'running' | 'offline' | 'busy';
+  // const appStatus: AppStatus = !isOnline || !wsConnected ? 'offline' : isAnyStreaming ? 'busy' : 'running';
 
   /* ── 上下文使用量估算 ── */
   const activeAgent = chat.activePanel?.agentId ? agents.find(a => a.id === chat.activePanel.agentId) : null;
@@ -213,12 +209,12 @@ export function ProjectWorkspace() {
                     if (newPanelId) { chat.setActivePanelId(newPanelId); tabs.createSessionTabFn({ agentId, agentName, agentColor, title: agentName, conversationId: newPanelId }); }
                   } else { chat.setActivePanelId(existing.id); }
                 } else {
-                  const newPanelId = await openPanel({ agentId, agentName, agentColor, projectId: currentProject?.id, initialMessage });
+                  await openPanel({ agentId, agentName, agentColor, projectId: currentProject?.id, initialMessage });
                   const fresh = useConversationStore.getState().openPanels.find(p => p.agentId === agentId);
                   if (fresh) { chat.setActivePanelId(fresh.id); tabs.createSessionTabFn({ agentId, agentName, agentColor, title: agentName, conversationId: fresh.id }); }
                 }
               },
-              onSwitchAgentInSession: async (agentId, agentName, agentColor) => {
+              onSwitchAgentInSession: async (agentId, agentName) => {
                 const current = chat.activePanel ?? openPanels.find(p => p.id === chat.activePanelId) ?? openPanels[0] ?? null;
                 if (!current?.conversationId) return;
                 const { switchAgent } = useConversationStore.getState();

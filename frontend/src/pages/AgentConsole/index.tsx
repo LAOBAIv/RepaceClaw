@@ -27,7 +27,7 @@ export function AgentConsole() {
   const { agents, fetchAgents } = useAgentStore();
   const { fetchProjects, createProject, projects: backendProjects } = useProjectStore();
   const { addProject, updateProject, restoreFromPersist: restoreProjectKanban } = useProjectKanbanStore();
-  const { updateTask, addTask, restoreFromPersist: restoreTasks } = useTaskStore();
+  const { updateTask, restoreFromPersist: restoreTasks } = useTaskStore();
 
   // 初始化数据加载
   useEffect(() => {
@@ -51,8 +51,8 @@ export function AgentConsole() {
 
   /* ── 节点状态 ── */
   const {
-    nodes, resetNodes, addNode, removeNode, updateNode, moveNode, confirmAgents,
-    pickerNodeId, setPickerNodeId, pickerNode,
+    nodes, resetNodes, addNode, removeNode, updateNode, moveNode,
+    pickerNodeId, setPickerNodeId,
     showAddMenu, setShowAddMenu, addBtnRef,
   } = useConsoleNodes(agentList, editTask, editProject, backendProjects);
 

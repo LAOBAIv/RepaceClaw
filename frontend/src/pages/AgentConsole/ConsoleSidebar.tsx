@@ -9,7 +9,7 @@ import { PRIORITY, getTagColor, PRESET_TAGS } from './constants';
 import type { DecisionMaker } from './constants';
 import { AgentAvatar } from './constants';
 import { DecisionPicker } from './components';
-import type { ConsoleEditTask, ConsoleEditProject } from './hooks/useConsoleState';
+import type { ConsoleEditTask } from './hooks/useConsoleState';
 
 interface ConsoleSidebarProps {
   // 表单字段
@@ -39,7 +39,7 @@ interface ConsoleSidebarProps {
   setShowDecisionPicker: (v: boolean) => void;
   // 编辑模式
   editTask: ConsoleEditTask | null; // [2026-05-24] 类型安全
-  editProject: ConsoleEditProject | null; // [2026-05-24] 类型安全
+  // editProject: ConsoleEditProject | null; // reserved for future use
   // 智能体列表
   agentList: Agent[];
 }
@@ -57,7 +57,8 @@ export function ConsoleSidebar({
   endTime, setEndTime,
   decisionMaker, setDecisionMaker,
   showDecisionPicker, setShowDecisionPicker,
-  editTask, editProject,
+  editTask,
+  // editProject, // reserved for future use
   agentList,
 }: ConsoleSidebarProps) {
   // 决策人显示名

@@ -81,7 +81,7 @@ export async function sendTyping(config: ILinkConfig, ilinkUserId: string, typin
   });
   try {
     await apiPost(config.baseUrl, 'ilink/bot/sendtyping', body, config.token, 5000);
-  } catch {}
+  } catch (err) { logger.warn(`[iLink] sendTyping failed: ${err}`); }
 }
 
 export async function getConfig(config: ILinkConfig, ilinkUserId: string, contextToken?: string): Promise<unknown> {

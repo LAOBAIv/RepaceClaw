@@ -20,7 +20,7 @@ export { makeFlowNode };
 
 export function MobileMultiAgentPanel({
   agents, currentAgentIds, currentAgentId,
-  collabNodes, setCollabNodes, isProject = false,
+  collabNodes, setCollabNodes,
   onInject, onSwitchAgent,
 }: MobileMultiAgentPanelProps) {
   const [pickerNode, setPickerNode] = useState<{ nodeId: string } | null>(null);

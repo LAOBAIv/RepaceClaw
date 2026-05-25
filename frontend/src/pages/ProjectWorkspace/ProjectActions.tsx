@@ -21,7 +21,6 @@ export function ProjectActions({
   onSetPriority,
   onUpgradeToProject,
   onDowngradeToTask,
-  onShowPriorityModal,
 }: {
   /** 项目/任务名称 */
   taskName: string;

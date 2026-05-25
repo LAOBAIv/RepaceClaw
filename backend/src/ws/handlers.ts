@@ -440,7 +440,7 @@ async function callGateway(
                 }));
               }
             }
-          } catch {}
+          } catch (err) { logger.warn(`[WS] SSE parse error: ${err}`); }
         }
       });
 

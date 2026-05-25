@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Loader2, TestTube2, CheckCircle2, XCircle, Pencil, Star, Trash2, ToggleLeft, ToggleRight, Plus } from 'lucide-react';
-import { Channel, TestResult, actBtn, lbl, inp } from './constants';
+import { Channel, TestResult, actBtn, inp } from './constants';
 
 interface Model {
   id: string;

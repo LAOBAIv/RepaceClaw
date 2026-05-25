@@ -7,7 +7,6 @@ import { useEffect, useState, useCallback } from 'react';
 import { ArrowLeft, Trash2, AlertTriangle, Pencil, Plus, Bot, Cpu } from 'lucide-react';
 import { useAgentStore } from '@/stores/agentStore';
 import { Agent } from '@/types';
-import apiClient from '@/api/client';
 import { COLORS, AGENT_TYPE_OPTIONS } from './constants';
 import { Props } from './types';
 import { AgentAvatar } from './AgentAvatar';

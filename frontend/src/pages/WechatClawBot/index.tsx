@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { MessageCircle, RefreshCw, QrCode, Wifi, WifiOff, Clock, Trash2, Users, Copy, Send, Database, ChevronRight, Radio } from 'lucide-react';
+import { MessageCircle, RefreshCw, QrCode, Wifi, WifiOff, Trash2, Users, Copy, Send, Database, ChevronRight, Radio } from 'lucide-react';
 import { API_BASE } from './constants';
 import type { WsState, SubTab, StatusData, ScanStatus, BoundAccount, Conversation, Message, QrType } from './types';
 
@@ -44,7 +44,6 @@ export function WechatClawBot() {
   const [pushLoading, setPushLoading] = useState(false);
   const [pushResult, setPushResult] = useState<string | null>(null);
   const [syncStates, setSyncStates] = useState<SyncState>({});
-  const [syncing, setSyncing] = useState(false);
   const [stats, setStats] = useState<StatsData | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
 
@@ -121,7 +120,6 @@ export function WechatClawBot() {
     } catch (e: unknown) { setPushResult('\u274c ' + (e as Error).message); } finally { setPushLoading(false); } // [2026-05-24] 类型安全
   };
 
-  const handleSyncNow = async () => { setSyncing(true); try { await fetch(API_BASE + '/sync-now', { method: 'POST' }); await fetchSyncStatus(); } catch (e) { console.warn("[WechatBot]", e); } finally { setSyncing(false); } };
   const copyText = (t: string) => navigator.clipboard.writeText(t);
 
   // Styles
@@ -134,9 +132,6 @@ export function WechatClawBot() {
   const card: React.CSSProperties = { background: '#fff', borderRadius: 10, border: '1px solid #e5e7eb', marginBottom: 16 };
   const cHeader: React.CSSProperties = { padding: '12px 16px', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'space-between' };
   const cTitle: React.CSSProperties = { fontSize: 14, fontWeight: 600, color: '#1a202c' };
-  const sBox: React.CSSProperties = { background: '#f9fafb', borderRadius: 8, padding: '10px 14px', flex: 1 };
-  const sLabel: React.CSSProperties = { fontSize: 11, color: '#9ca3af', marginBottom: 2 };
-  const sValue: React.CSSProperties = { fontSize: 14, fontWeight: 600, color: '#374151' };
   const btnP: React.CSSProperties = { padding: '8px 20px', fontSize: 13, fontWeight: 500, background: '#16a34a', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer' };
   const btnS: React.CSSProperties = { padding: '4px 12px', fontSize: 12, background: '#f3f4f6', color: '#374151', border: '1px solid #e5e7eb', borderRadius: 6, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 };
   const bdg = (color: string, bg: string): React.CSSProperties => ({ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: bg, color, fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 4 });

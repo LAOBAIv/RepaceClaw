@@ -18,7 +18,6 @@ import {
   setWsReconnectTimer,
   getWsReconnectTimer,
   notifyConversationWsSubscribers,
-  ensureWsOpen,
 } from "./wsUtils";
 
 // ── 类型定义 ──
@@ -603,7 +602,7 @@ export function createSwitchTabAction(set: SetState, get: GetState) {
   };
 }
 
-export function createSwitchAgentAction(set: SetState, get: GetState) {
+export function createSwitchAgentAction(set: SetState) {
   return async (sessionId: string, agentId: string) => {
     let switchedAgentIds: string[] | null = null;
     let switchedSessionCode: string | undefined;
@@ -809,7 +808,6 @@ export function createCreateSessionTabAction(set: SetState, get: GetState) {
           const convList = await conversationsApi.list();
           const conv = convList.find(c => c.id === opts.conversationId);
 
-          let actualConversationId = opts.conversationId;
           let messages: Message[] = [];
 
           if (opts.conversationId === 'wechat-assistant') {
@@ -948,7 +946,7 @@ export function createPermanentlyCloseSessionAction(set: SetState, get: GetState
   };
 }
 
-export function createBindPanelToTabAction(set: SetState, get: GetState) {
+export function createBindPanelToTabAction(set: SetState) {
   return (tabId: string, panelId: string, title: string, color?: string) => {
     set((s: ConversationStoreState) => ({
       sessionTabs: s.sessionTabs.map((t) =>

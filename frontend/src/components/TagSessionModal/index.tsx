@@ -11,7 +11,7 @@ import { conversationsApi } from '@/api/conversations';
 import { sessionTabsApi } from '@/api/sessionTabs';
 import { TagSessionModalProps } from './types';
 import { AgentSelector } from './AgentSelector';
-import { DEFAULT_AGENT_COLOR, DEFAULT_TASK_COLOR } from './constants';
+import { DEFAULT_AGENT_COLOR } from './constants';
 
 export function TagSessionModal({ open, tag, onClose, onCreated }: TagSessionModalProps) {
   const [taskName, setTaskName] = useState(tag || '');
@@ -21,7 +21,6 @@ export function TagSessionModal({ open, tag, onClose, onCreated }: TagSessionMod
 
   const { agents } = useAgentStore();
   const { addProject: addKanbanProject } = useProjectKanbanStore();
-  const conversationStore = useConversationStore();
 
   if (!open) return null;
 
@@ -106,14 +105,6 @@ export function TagSessionModal({ open, tag, onClose, onCreated }: TagSessionMod
 
       // 4. 新建 BrowserTab 并切换
       const tabKey = convId;
-      const newTab = {
-        key: tabKey,
-        title: taskName.trim(),
-        conversationId: convId,
-        agentId: mainAgent.id,
-        agentName: mainAgent.name,
-        color: mainAgent.color ?? DEFAULT_AGENT_COLOR,
-      };
 
       // 通过回调通知外层更新 browserTabs + activeBrowserTabKey + activePanelId
       onCreated(convId);

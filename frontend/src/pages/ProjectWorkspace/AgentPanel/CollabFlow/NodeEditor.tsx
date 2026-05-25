@@ -276,7 +276,6 @@ export function NodeRow({
       <div style={{ display: 'flex', gap: 0, alignItems: 'stretch' }}>
         {row.map((node, colIdx) => {
           const gIdx = globalIdx(node.id);
-          const isParallel = node.nodeType === 'parallel';
           return (
             <div key={node.id} style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'stretch' }}>
               {/* 并行节点间竖线 + 符号 */}

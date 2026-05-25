@@ -7,7 +7,6 @@
 import { useState, useEffect } from 'react';
 import { Users, FolderTree, RefreshCw } from 'lucide-react';
 import { adminOrganizationsApi, OrganizationUser, DepartmentNode } from '../../api/adminOrganizations';
-import { authApi } from '../../api/auth';
 import { useAuthStore } from '../../stores/authStore';
 import { UserListTable } from './UserListTable';
 import { UserDetailModal, EditUserModal } from './UserDetailModal';
@@ -158,29 +157,6 @@ export function UserManagement() {
     // [2026-05-24] 类型安全
     } catch (e: unknown) {
       alert(`删除失败: ${e instanceof Error ? e.message : '未知错误'}`);
-    }
-  }
-
-  // 管理员重置用户密码
-  async function handleResetPassword(userId: string, username: string) {
-    const newPwd = prompt(`重置用户「${username}」的密码\n请输入新密码（至少6位）:`);
-    if (!newPwd) return;
-    if (newPwd.length < 6) { alert('密码不能少于6位'); return; }
-    try {
-      await authApi.resetPassword(userId, newPwd);
-      alert(`用户「${username}」密码已重置`);
-    // [2026-05-24] 类型安全
-    } catch (e: unknown) {
-      // [2026-05-24] 类型安全 — Axios 风格错误提取
-      const axiosData = (err: unknown): string | null => {
-        if (err && typeof err === 'object' && 'response' in err) {
-          const r = (err as { response?: { data?: { error?: string } } }).response;
-          return r?.data?.error ?? null;
-        }
-        return null;
-      };
-      const msg = axiosData(e) || (e instanceof Error ? e.message : '未知错误');
-      alert(`重置失败: ${msg}`);
     }
   }
 

@@ -37,7 +37,7 @@ export interface FileListParams {
 
 export const filesApi = {
   async list(projectIdOrParams?: string | FileListParams, conversationId?: string): Promise<FileAsset[]> {
-    let params: Record<string, string> = {};
+    const params: Record<string, string> = {};
     if (typeof projectIdOrParams === 'object') {
       // 新版参数格式
       const p = projectIdOrParams;

@@ -4,7 +4,7 @@
  */
 import {
   Bot, Layers,
-  Settings, Network, Sparkles, PlusCircle, Wrench, Puzzle, ShieldCheck, Library, Brain,
+  Settings, Network, Sparkles, PlusCircle, Wrench, Puzzle, Library, Brain,
 } from 'lucide-react';
 
 /* ─── 页面标题映射 ─────────────────────────────────────────── */

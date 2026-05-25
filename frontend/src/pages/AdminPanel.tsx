@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ShieldCheck, Cpu, Users, FileText, Route, LayoutTemplate, Bot, MessageCircle } from 'lucide-react';
+import { Cpu, Users, FileText, Route, Bot, MessageCircle } from 'lucide-react';
 import { ModelChannels } from './ModelChannels';
 import { AgentChannelOverview } from '../components/AgentChannelOverview';
 import { UserManagement } from './UserManagement';

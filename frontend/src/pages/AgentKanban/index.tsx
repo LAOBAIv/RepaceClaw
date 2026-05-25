@@ -4,7 +4,6 @@
  * 会话列表看板，包含 Tab 切换、搜索过滤、会话卡片渲染。
  */
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Zap, Search, X, Loader2, CheckCircle2, Trash2,
 } from 'lucide-react';
@@ -14,7 +13,6 @@ import { COL_CONFIG } from './constants';
 import { SessionCardItem } from './SessionCardItem';
 
 export function AgentKanban() {
-  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<SessionColumn>('progress');
   const [searchText, setSearchText] = useState('');
 
@@ -49,7 +47,6 @@ export function AgentKanban() {
 
   const currentSessions = activeTab === 'progress' ? progressSessions : activeTab === 'deleted' ? deletedSessions : doneSessions;
   const cfg = COL_CONFIG[activeTab];
-  const Icon = cfg.icon;
 
   return (
     <div style={{

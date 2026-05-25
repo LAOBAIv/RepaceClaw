@@ -9,8 +9,8 @@
  * - 表格在小屏（≤420px）自动切换为竖排卡片视图
  * - 用户消息右侧深色气泡，AI 消息左侧浅色气泡
  */
-import React, { useEffect, useRef, useCallback } from 'react';
-import { ChatMessage, MobileChatMessagesProps, MobileMessageRowProps } from './types';
+import React, { useEffect, useRef } from 'react';
+import { MobileChatMessagesProps, MobileMessageRowProps } from './types';
 import { MarkdownContent } from './MarkdownContent';
 import { formatMessageTime } from './utils';
 
@@ -18,7 +18,7 @@ import { formatMessageTime } from './utils';
  * 单条消息行
  * ───────────────────────────────────────────── */
 function MobileMessageRow({
-  msg, defaultAgentName, defaultAgentColor, defaultModelName, showAvatar, showTime,
+  msg, defaultAgentName, defaultAgentColor, defaultModelName, showTime,
 }: MobileMessageRowProps) {
   const isUser = msg.role === 'user';
   const isStreaming = Boolean(msg.streaming);
@@ -94,13 +94,7 @@ export function MobileChatMessages({
   const containerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const prevCountRef = useRef(0);
-  const lastScrollHeightRef = useRef(0);
 
-  const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
-    if (containerRef.current) {
-      containerRef.current.scrollTop = containerRef.current.scrollHeight;
-    }
-  }, []);
 
   useEffect(() => {
     const msgCount = messages.length;

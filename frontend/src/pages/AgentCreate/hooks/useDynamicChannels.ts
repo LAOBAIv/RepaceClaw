@@ -10,7 +10,6 @@
 import { useState, useEffect } from 'react';
 import apiClient from '@/api/client';
 import type { CodeChannel, CodeModel, BackendModel, BackendProvider } from '../types';
-import { CODE_CHANNELS } from '../constants';
 import { TOKEN_CACHE_PREFIX } from '../utils';
 
 export interface UseDynamicChannelsReturn {
@@ -93,7 +92,7 @@ export function useDynamicChannels(): UseDynamicChannelsReturn {
         }
       })
       .catch(() => { setDynamicChannels([]); });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, []);
 
   /* ── 获取平台预设（兜底）渠道 ── */

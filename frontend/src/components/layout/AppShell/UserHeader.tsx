@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ChevronDown, Copy, Check,
-  User, Mail, Shield, LogOut, Settings,
+  Mail, Shield, LogOut, Settings,
 } from 'lucide-react';
 import { useAuthStore } from '../../../stores/authStore';
 import { getOrCreateTabId, clearAllSessionData, clearAllRcStorage } from '../../../lib/storageScope';

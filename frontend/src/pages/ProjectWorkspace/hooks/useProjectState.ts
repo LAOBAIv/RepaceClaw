@@ -20,7 +20,7 @@ export function useProjectState(
 ) {
   const { currentProject, projects, fetchProjects } = useProjectStore();
   const { agents } = useAgentStore();
-  const { addTaskFromChat, tasks, updateTask } = useTaskStore();
+  const { tasks, updateTask } = useTaskStore();
   const { projects: kanbanProjects, updateProject: updateKanbanProject, addProject: addKanbanProject } = useProjectKanbanStore();
 
   /** 当前是否为项目模式（可动态升级/降级） */

@@ -42,7 +42,7 @@ const ALL_COLUMNS = [
 ] as const;
 
 export function UserAgentsAdmin() {
-  const [data, setData] = useState<any[]>([]);
+  const [data, setData] = useState<Record<string, unknown>[]>([]);
   const [stats, setStats] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -77,7 +77,7 @@ export function UserAgentsAdmin() {
     return true;
   });
 
-  function toggleCol(k: string) { setCols(p => { const n = new Set(p); n.has(k) ? n.delete(k) : n.add(k); return n; }); }
+  function toggleCol(k: string) { setCols(p => { const n = new Set(p); if (n.has(k)) n.delete(k); else n.add(k); return n; }); }
   const active = ALL_COLUMNS.filter(c => cols.has(c.key));
 
   function cell(c: Record<string, unknown>, k: string) { // [2026-05-24] 类型安全

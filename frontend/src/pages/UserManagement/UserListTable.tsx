@@ -5,7 +5,7 @@
 
 import { Users, Search, Edit3, Trash2, Eye, MessageCircle } from 'lucide-react';
 import { OrganizationUser } from '../../api/adminOrganizations';
-import { ROLE_MAP, STATUS_MAP } from './constants';
+import { STATUS_MAP } from './constants';
 
 interface UserListTableProps {
   users: OrganizationUser[];
@@ -71,7 +71,6 @@ export function UserListTable({
           </thead>
           <tbody>
             {filteredUsers.map(user => {
-              const roleInfo = ROLE_MAP[user.role] || ROLE_MAP.user;
               const statusInfo = STATUS_MAP[user.status] || STATUS_MAP.active;
               return (
                 <tr key={user.id} style={{ borderBottom: '1px solid #f5f5f5' }}>

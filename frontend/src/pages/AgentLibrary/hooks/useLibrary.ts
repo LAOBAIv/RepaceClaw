@@ -101,7 +101,7 @@ export function useLibrary(): UseLibraryReturn {
   const sortedTemplates = useMemo(
     () =>
       selectedCategory === "all"
-        ? [...filtered].sort((a, b) => {
+        ? [...filtered].sort(() => {
             if (sortBy === "random") {
               return Math.random() - 0.5;
             }

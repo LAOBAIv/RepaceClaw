@@ -7,7 +7,7 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { TAG_COLOR_POOL, getTagColor } from './TagPanel';
+import { getTagColor } from './TagPanel';
 
 // 预设任务标签
 const TASK_PRESET_TAGS = ['进行中', '待完成', '紧急', '重要', '日常', '项目', '会议', '调研', '测试', 'Bug修复'];
@@ -32,7 +32,7 @@ function saveSessionTags(conversationId: string, tags: string[]) {
   localStorage.setItem(getStorageKey(conversationId), JSON.stringify(tags));
 }
 
-export function TaskTagPanel({ conversationId, taskName }: TaskTagPanelProps) {
+export function TaskTagPanel({ conversationId }: TaskTagPanelProps) {
   const [localTags, setLocalTags] = useState<string[]>(() =>
     conversationId ? loadSessionTags(conversationId) : []
   );

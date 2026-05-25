@@ -3,6 +3,7 @@
  */
 import * as fs from 'fs';
 import * as path from 'path';
+import { logger } from '../../utils/logger';
 
 const ILINK_ACCOUNT_PATH = '/root/.openclaw/openclaw-weixin/accounts/868c6e16ab10-im-bot.json';
 const SYNC_BUF_PATH = '/root/repaceclaw/backend/data/ilink-sync-buf.txt';
@@ -20,7 +21,7 @@ export function getAppId(): string {
   try {
     const pkg = JSON.parse(fs.readFileSync('/root/.openclaw/extensions/openclaw-weixin/package.json', 'utf-8'));
     cachedAppId = pkg.ilink_appid || '';
-  } catch {}
+  } catch (err) { logger.warn(`[iLink] Failed to read ilink_appid from package.json: ${err}`); }
   return cachedAppId;
 }
 
@@ -45,5 +46,5 @@ export function saveSyncBuf(buf: string): void {
     const dir = path.dirname(SYNC_BUF_PATH);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(SYNC_BUF_PATH, buf);
-  } catch {}
+  } catch (err) { logger.warn(`[iLink] Failed to save sync buffer: ${err}`); }
 }

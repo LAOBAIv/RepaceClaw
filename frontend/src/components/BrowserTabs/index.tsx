@@ -11,7 +11,7 @@
  * └─────────────────────────────────────────────────┘
  */
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useCallback, useRef } from 'react';
 
 // ============ 类型定义 ============
 

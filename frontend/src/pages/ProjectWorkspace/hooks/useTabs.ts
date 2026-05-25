@@ -11,7 +11,6 @@ import { showToast } from '@/components/Toast';
 
 export function useTabs() {
   const rawSessionTabs = useConversationStore(s => s.sessionTabs);
-  const getTabs = useConversationStore(s => s.getTabs);
   const storeActiveId = useConversationStore(s => s.activeTabId);
   const switchTab = useConversationStore(s => s.switchTab);
   const closeTabFn = useConversationStore(s => s.closeTab);

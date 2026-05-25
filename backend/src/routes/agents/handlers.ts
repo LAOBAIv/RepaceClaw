@@ -4,6 +4,7 @@ import { Request, Response } from 'express';
 import { AgentService } from '../../services/AgentService';
 import { getDb } from '../../db/client';
 import { asyncHandler } from '../../utils/asyncHandler';
+import { logger } from '../../utils/logger';
 import {
   sendSuccess,
   sendCreated,
@@ -152,7 +153,7 @@ export const channelOverview = asyncHandler(async (_req: Request, res: Response)
     ocAgents = (data?.agents?.list || []).filter((a: Record<string, unknown>) =>
       (a['id'] as string)?.startsWith('rc-') || a['id'] === 'repaceclaw-platform-assistant'
     );
-  } catch {}
+  } catch (err) { logger.warn(`[Agents] Failed to load OpenClaw agents config: ${err}`); }
 
   const allAgents = AgentService.list();
   const { getAllAgentTypes, toOpenClawAgentId, fromOpenClawAgentId } = require('../../services/AgentBridge/AgentMapper');

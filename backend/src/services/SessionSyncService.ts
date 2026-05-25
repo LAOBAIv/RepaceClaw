@@ -8,6 +8,7 @@
  * 4. 创建 session_mapping 映射记录
  * 5. 返回同步后的会话列表
  */
+import { logger } from '../utils/logger';
 import fs from 'fs';
 import path from 'path';
 
@@ -70,7 +71,7 @@ function parseSessionFile(filePath: string): { title?: string; agentName?: strin
           lastAssistantMessage = content.substring(0, 200);
         }
       }
-    } catch {}
+    } catch (err) { logger.warn(`[SessionSync] Failed to extract first user message: ${err}`); }
   }
 
   // 用第一条用户消息作为标题

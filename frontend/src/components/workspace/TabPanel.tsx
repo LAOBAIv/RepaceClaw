@@ -61,7 +61,7 @@ const contentStyle: React.CSSProperties = {
 
 export function TabPanel({
   tab, onClose,
-  agents, tasks, taskName,
+  agents, taskName,
   onInject, onSend,
   matchedProject,
   incomingAgentNames,

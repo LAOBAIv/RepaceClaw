@@ -41,15 +41,12 @@ export function MobileBottomComposer({
   activeTab: controlledActiveTab,
   conversationId,
   taskName,
-  onFileUpload,
   placeholder = '输入消息...',
-  onInject,
   onSwitchAgent,
   agents,
   currentAgentId,
   currentAgentIds,
   collabNodes: extCollabNodes,
-  setCollabNodes: extSetCollabNodes,
   isProject,
 }: MobileBottomComposerProps) {
   /* ── 受控 / 非受控输入值 ── */

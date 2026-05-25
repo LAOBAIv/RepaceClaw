@@ -58,16 +58,6 @@ export function NewTabModal({ open, onClose, onCreated }: NewTabModalProps) {
       const selectedAgents = agents.filter(a => selectedAgentIds.includes(a.id));
       const mainAgent = selectedAgents[0];
 
-      // ⚠️ 平台助手不在标签栏可选范围内（仅侧边栏入口可用）
-      const filteredAgents = agents.filter(a =>
-        !a.isSystem &&
-        !(a.id === '24cf6cc5-da0d-48df-814e-11582e398007'
-          || a.id === 'platform-assistant'
-          || a.id === 'repaceclaw-platform-assistant'
-          || a.id === 'rc-wechat-agent'
-          || a.agentCode === 'rc-wechat-agent')
-      );
-
       if (selectedAgentIds.length === 1 && (mainAgent.id === '24cf6cc5-da0d-48df-814e-11582e398007' || mainAgent.id === 'platform-assistant' || mainAgent.id === 'repaceclaw-platform-assistant')) {
         const panelId = await useConversationStore.getState().openPanel({
           agentId: mainAgent.id,

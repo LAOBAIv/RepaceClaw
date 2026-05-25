@@ -10,7 +10,6 @@ import type { UseSkillsReturn } from './useSkills';
 import type { UseCodeModelReturn } from './useCodeModel';
 import type { UseTokenReturn } from './useToken';
 import type { UseAgentFormReturn } from './useAgentForm';
-import { CODE_CHANNELS } from '../constants';
 
 interface UseAgentCreateEventsParams {
   form: UseAgentFormReturn;
@@ -63,7 +62,7 @@ export function useAgentCreateEvents({
       selChannel, token.hasBackendKey, presetChannel,
       codeModel.customMaxTokens, codeModel.customTemp, codeModel.customTopP,
       codeModel.customFreqPenalty, codeModel.customPresPenalty,
-      (m: CodeModel) => {/* handled in confirmTokenModal */},
+      (m: CodeModel) => {void m;},
     );
   };
 

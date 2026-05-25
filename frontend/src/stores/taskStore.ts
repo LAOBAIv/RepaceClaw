@@ -228,10 +228,7 @@ export const useTaskStore = create<TaskState>()(
 
           // 按 sort_order 排序
           for (const col of ['progress', 'done'] as Column[]) {
-            result[col].sort((a, b) => {
-              // 简单按 updatedAt 排序（后端 sort_order 已映射不到前端）
-              return 0;
-            });
+            result[col].sort(() => 0);
           }
 
           set({ tasks: result });

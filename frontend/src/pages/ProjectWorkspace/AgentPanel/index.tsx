@@ -8,7 +8,6 @@
  */
 import React, { useState } from 'react';
 import type { Agent, ConversationPanel } from '@/types';
-import type { KanbanProject } from '@/stores/projectKanbanStore';
 import type { FlowNode } from '../types';
 import { AgentList } from './AgentList';
 import { AgentControls } from './AgentControls';
@@ -18,17 +17,12 @@ import { ProjectUpgrade } from './ProjectUpgrade';
 export function AgentPanel({
   agents,
   agentStatusMap,
-  taskName,
-  matchedProject,
-  onInject,
-  incomingAgentNames,
   openPanels,
   activePanelId,
   onSwitchPanel,
   onOpenPanel,
   onSwitchAgent,
   onClosePanel,
-  currentProjectId,
   collabNodes,
   setCollabNodes,
   isProject,
@@ -38,17 +32,12 @@ export function AgentPanel({
 }: {
   agents?: Agent[];
   agentStatusMap: Record<string, { label: string; color: string }>;
-  taskName?: string;
-  matchedProject?: KanbanProject | null;
-  onInject?: (text: string) => void;
-  incomingAgentNames?: string[];
   openPanels: ConversationPanel[];
   activePanelId: string | null;
   onSwitchPanel: (panelId: string) => void;
   onOpenPanel: (agentId: string, agentName: string, agentColor: string, initialMessage?: string) => void;
   onSwitchAgent: (agentId: string, agentName: string, agentColor: string) => void;
   onClosePanel: (panelId: string) => void;
-  currentProjectId?: string;
   collabNodes: FlowNode[];
   setCollabNodes: React.Dispatch<React.SetStateAction<FlowNode[]>>;
   /** 当前是项目（true）还是任务（false） */

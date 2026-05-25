@@ -27,7 +27,6 @@ export default function AgentLibrary() {
     setSearchTerm,
     loading,
     successMsg,
-    setSuccessMsg,
     paginatedTemplates,
     totalPages,
     grouped,

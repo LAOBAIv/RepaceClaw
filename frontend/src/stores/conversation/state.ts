@@ -1,5 +1,5 @@
 // [2026-05-25] 状态配置 — 从 conversationStore.ts 拆分
-import { getCurrentUserId, getOrCreateTabId } from "../../lib/storageScope";
+import { getCurrentUserId } from "../../lib/storageScope";
 
 // 持久化存储 basename
 export const CONV_STORE_BASENAME = 'rc:conv';

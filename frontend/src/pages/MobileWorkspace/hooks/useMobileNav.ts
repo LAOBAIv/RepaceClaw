@@ -112,7 +112,7 @@ export function useMobileNav(
   }, [newAgentName, newAgentColor, newAgentType, newAgentModel, newAgentPrompt, fetchAgents]);
 
   /* ── 智能体编辑 ── */
-  const handleUpdateAgent = useCallback(async (agentId: string, data: Record<string, any>) => {
+  const handleUpdateAgent = useCallback(async (agentId: string, data: Record<string, unknown>) => {
     try {
       await apiClient.put(`/agents/${agentId}`, data);
       await fetchAgents();

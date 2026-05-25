@@ -38,7 +38,7 @@ export function TokenModal({
   tempTokenValue, onTempTokenValueChange,
   tempCustomUrl, onTempCustomUrlChange,
   tempTokenModel, onTempTokenModelChange,
-  showToken, onShowTokenToggle,
+  showToken, // onShowTokenToggle reserved for future use
 }: TokenModalProps) {
   if (!open) return null;
 
@@ -180,7 +180,7 @@ export function TokenModal({
             <button className="ac-modal-btn-cancel" onClick={onClose}>取消</button>
             <button
               className="ac-modal-btn-confirm"
-              disabled={true && !hasBackendKey && (!tempTokenValue.trim() || !tempTokenModel)}
+              disabled={!hasBackendKey && (!tempTokenValue.trim() || !tempTokenModel)}
               onClick={onConfirm}
             >确认</button>
           </div>

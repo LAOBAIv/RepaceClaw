@@ -1,5 +1,6 @@
 import fs from 'fs';
 import { getDb } from "../../db/client";
+import { logger } from '../../utils/logger';
 
 export interface Agent {
   id: string;
@@ -129,7 +130,7 @@ export function buildPlatformAssistantAgent(): Agent {
     if (result.length && result[0].values.length) {
       dbId = result[0].values[0][0] as string;
     }
-  } catch {}
+  } catch (err) { logger.warn(`[AgentService] Platform assistant DB lookup failed: ${err}`); }
   return {
     id: dbId,
     agentCode: 'platform-assistant',

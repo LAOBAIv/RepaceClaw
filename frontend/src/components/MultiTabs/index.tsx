@@ -80,11 +80,6 @@ const MultiTabs: React.FC<MultiTabsProps> = ({
     [internalItems, onSort]
   );
 
-  // 获取缓存的标签状态
-  const getCachedState = useCallback((key: string) => {
-    return cacheRef.current.get(key);
-  }, []);
-
   // 关闭单个标签
   const handleClose = useCallback(
     (key: string, e?: React.MouseEvent) => {

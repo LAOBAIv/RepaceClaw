@@ -144,10 +144,10 @@ export function useToken(
         id: resolvedModelId || tempTokenModel.id,
         name: tempTokenModel.name?.trim() || resolvedModelId || tempTokenModel.id,
         maxTokens: Number(cMaxTokens) || tempTokenModel.maxTokens,
-        temperature: Number(cTemp) ?? tempTokenModel.temperature,
-        topP: Number(cTopP) ?? tempTokenModel.topP,
-        frequencyPenalty: Number(cFreqPenalty) ?? tempTokenModel.frequencyPenalty,
-        presencePenalty: Number(cPresPenalty) ?? tempTokenModel.presencePenalty,
+        temperature: Number(cTemp) || tempTokenModel.temperature,
+        topP: Number(cTopP) || tempTokenModel.topP,
+        frequencyPenalty: Number(cFreqPenalty) || tempTokenModel.frequencyPenalty,
+        presencePenalty: Number(cPresPenalty) || tempTokenModel.presencePenalty,
       });
     }
 

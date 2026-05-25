@@ -21,7 +21,7 @@ export function MarkdownContent({ content, isUser }: MarkdownContentProps) {
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
-          code({ node, inline, className, children, ...rest }: React.ComponentProps<'code'> & { inline?: boolean }) { // [2026-05-24] 类型安全
+          code({ inline, className, children, ...rest }: React.ComponentProps<'code'> & { inline?: boolean }) { // [2026-05-24] 类型安全
             const match = /language-(\w+)/.exec(className || '');
             const language = match ? match[1] : 'text';
             if (inline) {

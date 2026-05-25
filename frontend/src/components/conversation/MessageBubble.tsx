@@ -28,7 +28,7 @@ function parsePreviewCode(content: string): { preview: string; code: string; res
   const preview = previewMatch ? previewMatch[1].trim() : '';
   const code = codeMatch ? codeMatch[1].trim() : '';
 
-  let rest = content
+  const rest = content
     .replace(/<!--\s*PREVIEW_START\s*-->[\s\S]*?<!--\s*PREVIEW_END\s*-->/gi, '')
     .replace(/<!--\s*CODE_START\s*-->[\s\S]*?<!--\s*CODE_END\s*-->/gi, '')
     .trim();

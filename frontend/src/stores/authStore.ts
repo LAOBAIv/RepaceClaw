@@ -36,6 +36,7 @@ export const useAuthStore = create<AuthStore>()(
       logout: () => {
         // [2026-05-19] 退出时清空前端状态，不再写 localStorage（改用后端 active 状态恢复）
         try {
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
           const { useConversationStore } = require('../stores/conversationStore');
           useConversationStore.setState({
             openPanels: [],

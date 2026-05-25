@@ -65,8 +65,8 @@ export interface UserPermissionSummary {
     isPrimary: boolean;
     status: string;
     joinedAt: string;
-    rolePermissions: Record<string, any>;
-    templateConfig: Record<string, any>;
+    rolePermissions: Record<string, unknown>;
+    templateConfig: Record<string, unknown>;
   }>;
   proxyGrants: Array<{
     id: string;
@@ -91,7 +91,7 @@ export interface UserPermissionSummary {
   }>;
   effectivePermissions: {
     source: string[];
-    raw: Record<string, any>;
+    raw: Record<string, unknown>;
     flags: {
       canViewOrganization: boolean;
       canEditOrganization: boolean;

@@ -32,7 +32,7 @@ export function ModelChannels() {
   const [editingProvider, setEditingProvider] = useState<string | null>(null);
   const [showApiKey, setShowApiKey] = useState(true);
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [isCustom, setIsCustom] = useState(false);
+  const [, setIsCustom] = useState(false);
   const [models, setModels] = useState<ModelItem[]>([]);
   const [editingModel, setEditingModel] = useState<ModelItem | null>(null);
   const [showModelModal, setShowModelModal] = useState(false);
@@ -46,7 +46,7 @@ export function ModelChannels() {
       const [mRes, pRes] = await Promise.all([apiClient.get('/models'), apiClient.get('/model-providers')]);
       const provs = pRes.data.data || [];
       // 建立 provider baseUrl -> channel id 的映射
-      setModels((mRes.data.data || []).map((m: Record<string, any>) => {
+      setModels((mRes.data.data || []).map((m: Record<string, unknown>) => {
         const prov = provs.find((p: Provider) => p.id === m.providerId);
         return { ...m, providerName: prov?.name || '', providerBaseUrl: prov?.baseUrl || '' };
       }));

@@ -12,7 +12,7 @@ import { useState, useCallback } from 'react';
 import { showToast } from '@/components/Toast';
 import type { CodeChannel, CodeModel } from '../types';
 import { CODE_CHANNELS } from '../constants';
-import { loadTokenCache, saveTokenCache } from '../utils';
+import { loadTokenCache } from '../utils';
 
 export interface UseCodeModelReturn {
   // 弹窗状态
@@ -147,10 +147,10 @@ export function useCodeModel(
       id: tempModel.id?.trim() || tempModel.id,
       name: tempModel.name?.trim() || tempModel.id,
       maxTokens: Number(customMaxTokens) || tempModel.maxTokens,
-      temperature: Number(customTemp) ?? tempModel.temperature,
-      topP: Number(customTopP) ?? tempModel.topP,
-      frequencyPenalty: Number(customFreqPenalty) ?? tempModel.frequencyPenalty,
-      presencePenalty: Number(customPresPenalty) ?? tempModel.presencePenalty,
+      temperature: Number(customTemp) || tempModel.temperature,
+      topP: Number(customTopP) || tempModel.topP,
+      frequencyPenalty: Number(customFreqPenalty) || tempModel.frequencyPenalty,
+      presencePenalty: Number(customPresPenalty) || tempModel.presencePenalty,
     };
 
     setSelectedChannel(tempChannel);

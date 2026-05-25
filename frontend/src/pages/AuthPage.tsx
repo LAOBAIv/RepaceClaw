@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
 import { authApi } from "../api/auth";
 import { useAuthStore } from "../stores/authStore";
 import { initTabSession, clearUserData, clearAllRcStorage } from "../lib/storageScope";
@@ -8,7 +7,6 @@ import apiClient from "../api/client";
 type Mode = "login" | "register";
 
 export function AuthPage() {
-  const navigate = useNavigate();
   const fromPath = (window.history.state?.usr as { fromPath?: string } | null)?.fromPath || '/workspace';
   const { login } = useAuthStore();
   const [mode, setMode] = useState<Mode>("login");
@@ -141,7 +139,7 @@ export function AuthPage() {
         if (qrPollRef.current) { clearInterval(qrPollRef.current); qrPollRef.current = null; }
         setShowQrcode(false);
       }, 180000);
-    } catch (e: unknown) { // [2026-05-24] 类型安全
+    } catch { // [2026-05-24] 类型安全
       setError('获取微信二维码失败');
     } finally {
       setQrLoading(false);

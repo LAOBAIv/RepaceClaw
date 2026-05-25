@@ -6,7 +6,6 @@
  * - 可见性选择（私有/公开/模板）
  * - Skill 安全管控（7 个 checkbox，按风险等级着色）
  */
-import { AGENT_TYPE_OPTIONS } from './constants';
 
 interface AdvancedSectionProps {
   memoryTurns: string;

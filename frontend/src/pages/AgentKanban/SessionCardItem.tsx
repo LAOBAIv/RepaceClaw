@@ -18,7 +18,7 @@ export function SessionCardItem({
 }: SessionCardItemProps) {
   const navigate = useNavigate();
   const [hovered, setHovered] = useState(false);
-  const [statusLoading, setStatusLoading] = useState(false);
+  const [statusLoading] = useState(false);
   const { agents } = useAgentStore();
   const createSessionTab = useConversationStore(s => s.createSessionTab);
 

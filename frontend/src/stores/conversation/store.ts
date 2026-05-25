@@ -129,7 +129,7 @@ export const useConversationStore = create<ConversationStore>()(
       name: CONV_STORE_BASENAME,
       version: 6,
       storage: createJSONStorage(() => convPersistStorage),
-      migrate: (persistedState: unknown, version: number) => {
+      migrate: () => {
         return {
           sessionTabs: [],
           activeTabId: '',

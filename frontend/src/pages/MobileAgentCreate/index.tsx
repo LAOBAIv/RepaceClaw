@@ -4,7 +4,7 @@
  * 路由兼容：该目录替代原 MobileAgentCreate.tsx 文件
  */
 import { useState, useCallback, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { useAgentStore } from '../../stores/agentStore';
 import { apiClient } from '../../api/client';
 import { COLOR_OPTIONS } from './constants';
@@ -17,7 +17,6 @@ import { AgentForm } from './AgentForm';
  * 字段和逻辑对齐PC端 AgentCreate.tsx
  */
 export function MobileAgentCreate({ onBack, initialTemplateState }: Props) {
-  const navigate = useNavigate();
   const location = useLocation();
   const { fetchAgents } = useAgentStore();
 
@@ -111,7 +110,7 @@ export function MobileAgentCreate({ onBack, initialTemplateState }: Props) {
 
     setLoading(true);
     try {
-      const payload: Record<string, any> = {
+      const payload: Record<string, unknown> = {
         name: name.trim(),
         color,
         agentType,

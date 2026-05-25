@@ -9,7 +9,7 @@ import {
   ChevronLeft, ChevronRight, MessageCircle, ShieldCheck,
 } from 'lucide-react';
 import { useAuthStore, type AuthUser } from '../../../stores/authStore';
-import { getOrCreateTabId, clearAllSessionData, clearAllRcStorage } from '../../../lib/storageScope';
+import { getOrCreateTabId } from '../../../lib/storageScope';
 import { getBroadcastSync, destroyBroadcastSync, getWsSync, destroyWsSync, syncEventBus } from '../../../lib/sync';
 import { getWsInstance } from '../../../stores/conversation';
 import { useSessionKanbanStore } from '../../../stores/sessionKanbanStore';
@@ -26,7 +26,7 @@ export function AppShell() {
   const { user, isAuthenticated } = useAuthStore();
   const isAdmin = user?.role === 'super_admin' || user?.role === 'admin';
   // [2026-05-19] 微信扫码用户补全信息弹窗
-  const [needSetup, setNeedSetup] = useState(false);
+  const [, setNeedSetup] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated || !user?.id) return;

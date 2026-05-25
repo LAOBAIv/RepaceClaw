@@ -46,7 +46,7 @@ export function AgentPicker({ agentList, selected, onClose, onConfirm }: {
 }) {
   const [draft, setDraft] = useState<Set<string>>(new Set(selected));
   const toggle = (id: string) =>
-    setDraft(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
+    setDraft(prev => { const s = new Set(prev); if (s.has(id)) s.delete(id); else s.add(id); return s; });
   return (
     <Modal onClose={onClose}>
       <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.14)', width: 660, maxWidth: 'calc(100vw - 32px)', maxHeight: '70vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', marginBottom: 32 }}>

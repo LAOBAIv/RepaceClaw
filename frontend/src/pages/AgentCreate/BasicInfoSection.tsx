@@ -8,7 +8,6 @@
  * - 输出格式（下拉选择）
  * - 执行分类（下拉选择 + 映射提示）
  */
-import type { CodeChannel } from './types';
 import { STYLE_TAGS, OUTPUT_TAGS, AGENT_TYPE_OPTIONS } from './constants';
 
 interface BasicInfoSectionProps {

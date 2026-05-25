@@ -11,7 +11,7 @@ interface MobileTableProps {
   [key: string]: unknown;
 }
 
-export function MobileTable({ children, isUser, ...props }: MobileTableProps) {
+export function MobileTable({ children, ...props }: MobileTableProps) {
   const [headers, setHeaders] = useState<string[]>([]);
   const [rows, setRows] = useState<string[][]>([]);
   const containerRef = useRef<HTMLDivElement>(null);

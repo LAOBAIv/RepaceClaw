@@ -4,7 +4,6 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { useProjectStore } from '@/stores/projectStore';
 import { Agent, Project } from '@/types';
 import { makeDefaultNode } from '../constants';
 import type { FlowNode, NodeType } from '../constants';

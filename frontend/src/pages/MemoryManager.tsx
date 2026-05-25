@@ -9,7 +9,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { Brain, Plus, Search, Trash2, Edit3, BarChart3 } from 'lucide-react';
+import { Brain, Plus, Search, Trash2, Edit3 } from 'lucide-react';
 import { memoriesApi, type MemoryRecord, type MemoryStats } from '@/api/memories';
 import { showToast } from '@/components/Toast';
 
@@ -69,7 +69,7 @@ export function MemoryManager() {
       setMemories(memRes.memories);
       setTotal(memRes.total);
       setStats(statsRes);
-    } catch (err) {
+    } catch {
       showToast('加载失败', 'error');
     } finally {
       setLoading(false);
@@ -84,7 +84,7 @@ export function MemoryManager() {
     try {
       const res = await memoriesApi.search(searchQuery, { topK: 10 });
       setSearchResults(res.results);
-    } catch (err) {
+    } catch {
       showToast('检索失败', 'error');
     }
   }
@@ -95,7 +95,7 @@ export function MemoryManager() {
       await memoriesApi.delete(id);
       showToast('已删除', 'success');
       loadData();
-    } catch (err) {
+    } catch {
       showToast('删除失败', 'error');
     }
   }
@@ -339,7 +339,7 @@ function MemoryModal({ memory, onClose, onSave }: { memory: MemoryRecord | null;
         showToast('创建成功', 'success');
       }
       onSave();
-    } catch (err) {
+    } catch {
       showToast(memory ? '更新失败' : '创建失败', 'error');
     } finally {
       setSaving(false);

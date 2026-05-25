@@ -83,7 +83,7 @@ export function MessageBubble({
                 remarkPlugins={[remarkGfm]}
                 components={{
                   code: (codeProps) => { // [2026-05-24] 类型安全
-                    const { node, inline, className, children, ...props } = codeProps as CodeProps;
+                    const { inline, className, children, ...props } = codeProps as CodeProps;
                     const match = /language-(\w+)/.exec(className || '');
                     const language = match ? match[1] : 'text';
                     if (inline) {
