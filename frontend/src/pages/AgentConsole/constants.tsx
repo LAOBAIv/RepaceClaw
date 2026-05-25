@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 /**
  * @file AgentConsole 常量与类型定义
  * 包含 FlowNode 类型、优先级/标签常量、标签颜色工具、日期工具等

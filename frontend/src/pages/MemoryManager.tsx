@@ -8,7 +8,7 @@
  * - 统计面板（总记忆数/分类分布/高频召回）
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Brain, Plus, Search, Trash2, Edit3 } from 'lucide-react';
 import { memoriesApi, type MemoryRecord, type MemoryStats } from '@/api/memories';
 import { showToast } from '@/components/Toast';
@@ -50,11 +50,7 @@ export function MemoryManager() {
 
   const pageSize = 20;
 
-  useEffect(() => {
-    loadData();
-  }, [page, categoryFilter, sourceFilter]);
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const [memRes, statsRes] = await Promise.all([
@@ -74,7 +70,11 @@ export function MemoryManager() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [page, categoryFilter, sourceFilter]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   async function handleSearch() {
     if (!searchQuery.trim()) {

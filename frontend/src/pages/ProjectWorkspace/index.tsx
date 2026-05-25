@@ -99,7 +99,7 @@ export function ProjectWorkspace() {
   React.useEffect(() => {
     const tab = tabs.allTabs.find(t => t.id === tabs.storeActiveId);
     if (tab?.panelId) chat.setActivePanelId(tab.panelId);
-  }, [tabs.allTabs, tabs.storeActiveId, chat.setActivePanelId]);
+  }, [tabs, chat]);
 
   /* ── 侧边 Tab 点击 ── */
   const handleTabClick = (tab: string) => {

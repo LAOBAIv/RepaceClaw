@@ -4,7 +4,7 @@
  * 职责：管理项目模式切换（升级/降级）、优先级读写、看板/任务匹配、协作流程节点。
  * 从原 ProjectWorkspace.tsx 中提取项目状态相关逻辑。
  */
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useProjectStore } from '@/stores/projectStore';
 import { useTaskStore } from '@/stores/taskStore';
 import { useProjectKanbanStore, type ProjectPriority } from '@/stores/projectKanbanStore';
@@ -51,7 +51,7 @@ export function useProjectState(
   const matchedTask = incomingTaskId ? allTasks.find(t => t.id === incomingTaskId) ?? null : null;
 
   /* ── 统一的 tags / priority 数据源 ── */
-  const currentTags: string[] = matchedTask?.tags ?? matchedKanbanProject?.tags ?? [];
+  const currentTags: string[] = useMemo(() => matchedTask?.tags ?? matchedKanbanProject?.tags ?? [], [matchedTask?.tags, matchedKanbanProject?.tags]);
   const currentPriority: ProjectPriority | null = (matchedTask?.priority as ProjectPriority | undefined) ?? matchedKanbanProject?.priority ?? null;
 
   /* ── 优先级读写 ── */

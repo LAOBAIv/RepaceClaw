@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 /**
  * 标签管理面板组件
  * 支持添加、删除、预设标签选择

@@ -179,7 +179,7 @@ export function useCodeModel(
       tokenValue: cached?.apiKey ?? tokenValue,
       customBaseUrl: tempChannel.id === 'custom' ? tempCustomUrl.trim() : (cached?.baseUrl ?? customBaseUrl),
     };
-  }, [tempModel, tempChannel, customMaxTokens, customTemp, customTopP, customFreqPenalty, customPresPenalty, tokenValue, customBaseUrl, setTokenValue, setCustomBaseUrl]);
+  }, [tempModel, tempChannel, customMaxTokens, customTemp, customTopP, customFreqPenalty, customPresPenalty, tokenValue, customBaseUrl, tempCustomUrl, setTokenValue, setCustomBaseUrl]);
 
   return {
     codeModelOpen,

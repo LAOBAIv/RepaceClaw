@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 /**
  * MobileMultiAgentPanel — 移动端多智能体协作面板
  *

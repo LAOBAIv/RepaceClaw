@@ -49,19 +49,19 @@ export function MobileWorkspace() {
     chat.handleSwitchTab(tabId);
     nav.setRightDrawerOpen(false);
     nav.setMobileView('workspace');
-  }, [chat.handleSwitchTab, nav.setRightDrawerOpen, nav.setMobileView]);
+  }, [chat, nav]);
 
   /* ── 包装 handleConfirmCreateSession：创建后关闭右抽屉 ── */
   const handleConfirmCreateSession = useCallback(async () => {
     await chat.handleConfirmCreateSession();
     nav.setRightDrawerOpen(false);
-  }, [chat.handleConfirmCreateSession, nav.setRightDrawerOpen]);
+  }, [chat, nav]);
 
   /* ── 取消重命名 ── */
   const handleCancelRename = useCallback(() => {
     chat.setRenamingTabId(null);
     chat.setRenameValue('');
-  }, [chat.setRenamingTabId, chat.setRenameValue]);
+  }, [chat]);
 
   /* ── 视图分支：非 workspace 视图直接返回对应页面 ── */
   if (nav.mobileView === 'sessions') {

@@ -109,7 +109,7 @@ export function useMobileNav(
       console.error('[MobileWorkspace:createAgent]', e);
       setShowToast('创建智能体失败');
     }
-  }, [newAgentName, newAgentColor, newAgentType, newAgentModel, newAgentPrompt, fetchAgents]);
+  }, [newAgentName, newAgentColor, newAgentType, newAgentModel, newAgentPrompt, fetchAgents, navigate, setShowToast]);
 
   /* ── 智能体编辑 ── */
   const handleUpdateAgent = useCallback(async (agentId: string, data: Record<string, unknown>) => {
@@ -121,7 +121,7 @@ export function useMobileNav(
       console.error('[MobileWorkspace:updateAgent]', e);
       setShowToast('更新智能体失败');
     }
-  }, [fetchAgents]);
+  }, [fetchAgents, setShowToast]);
 
   /* ── 智能体删除 ── */
   const handleDeleteAgent = useCallback(async (agentId: string) => {
@@ -135,7 +135,7 @@ export function useMobileNav(
       console.error('[MobileWorkspace:deleteAgent]', e);
       setShowToast('删除智能体失败');
     }
-  }, [fetchAgents]);
+  }, [fetchAgents, navigate, setShowToast]);
 
   return {
     // Drawer state
